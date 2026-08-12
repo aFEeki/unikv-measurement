@@ -57,7 +57,7 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 | Device-visible tier; counterbalanced A/B failure | `run_b1_ceiling.py`, `run_b1_interleaved.py` | `stress_results/b1_device_tier_ceiling.csv`, `b1_interleaved_ab.csv` | `b1_gpu_tier/B1_triage.txt`, `B1_verification_and_ceiling.txt` |
 | Retrieval + 32-token continuation (Table 2) | `run_quality_arms_unified.py` | `quality_results/quality_arms_unified.csv` | `quality_unified/quality_arms_analysis.txt` |
 | H2O comparator fidelity | `run_quality_probe.py` | `quality_results/quality_probe.csv` | `h2o_comparator/h2o_analysis.txt` |
-| 512-token identity, two prompts (Table 3) | `run_token_horizon.py` | `quality_results/token_horizon.csv`, traces in `token_horizon/sequences/` | `token_horizon/token_horizon_analysis.txt` |
+| 512-token identity, two prompts (Table 3, Fig. 4) | `run_token_horizon.py`, `make_fig8_horizon.py` | `quality_results/token_horizon.csv`, traces in `token_horizon/sequences/` | `token_horizon/token_horizon_analysis.txt` |
 | α sweep slope | `run_alpha_sweep_p3.py` | `alpha_results/p3_alpha_sweep_cooled_master.csv` | `r2_policy3/alpha_sweep_cooled_analysis.txt` — supersedes `alpha_sweep_analysis.txt`, which was thermally masked |
 | Drain control (Table 4, Fig. 3) | `run_drain_control.py`, `make_fig7_drain.py` | `alpha_results/p3_drain_control_master.csv` | `drain_control/drain_control_analysis.txt`, `fig7_provenance.txt` |
 | drain×α interaction; withdrawal of the 71/29 split (Table 5) | `run_drain_alpha1.py` | `alpha_results/p3_drain_alpha1_master.csv` | `drain_alpha1/drain_alpha_interaction_analysis.txt` — supersedes the decomposition in `drain_control/drain_control_analysis.txt` |
