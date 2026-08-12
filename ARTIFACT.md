@@ -15,11 +15,11 @@ analysis file stating the protocol, the exclusions and the arithmetic.
 | `figures/` | Figures as published, regenerable from `scripts/make_fig*.py` |
 | `llama.cpp` (submodule) | The fork the measurements run against |
 
-Two repositories, both needed:
+Two archives, both needed:
 
-- Harnesses and data — this repository
-- The fork — `llama.cpp-unikv`, pinned as a submodule at commit `7c2b27d`,
-  branched from upstream `9725a313b`
+- Harnesses and data — this repository, [10.5281/zenodo.21907114](https://doi.org/10.5281/zenodo.21907114)
+- The fork — `llama.cpp-unikv`, [10.5281/zenodo.21907123](https://doi.org/10.5281/zenodo.21907123),
+  pinned as a submodule at commit `7c2b27d`, branched from upstream `9725a313b`
 
 ## What is *not* here, and why
 

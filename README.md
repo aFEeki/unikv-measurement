@@ -91,8 +91,13 @@ The model is not redistributed. Every run uses Llama 3.1 8B Instruct at Q4_K_M.
 
 ## Citation
 
-Cite the paper and, for exactness, the pinned version DOI of this artifact rather
-than the concept DOI.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21907114.svg)](https://doi.org/10.5281/zenodo.21907114)
+
+- This artifact: [10.5281/zenodo.21907114](https://doi.org/10.5281/zenodo.21907114)
+- The `llama.cpp` fork: [10.5281/zenodo.21907123](https://doi.org/10.5281/zenodo.21907123)
+
+Both are concept DOIs and resolve to the latest release. Each Zenodo record also
+carries a version-specific DOI if you need to pin an exact snapshot.
 
 ## License
 
