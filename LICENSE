@@ -22,7 +22,7 @@ SOFTWARE.
 
 ---
 
-This license covers the measurement harnesses under scripts/ and the paper
-source under paper/. Result files and analyses are licensed separately under
+This license covers the measurement harnesses under scripts/. Result files
+and analyses are licensed separately under
 CC-BY-4.0; see LICENSE-DATA. The llama.cpp fork referenced as a submodule is
 licensed by its own authors under the MIT license.

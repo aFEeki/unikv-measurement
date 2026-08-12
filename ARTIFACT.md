@@ -12,14 +12,14 @@ analysis file stating the protocol, the exclusions and the arithmetic.
 | `scripts/` | Measurement harnesses and figure generators |
 | `stress_results/`, `alpha_results/`, `quality_results/` | Raw result CSVs |
 | `artifacts/` | Per-experiment analyses, run logs, prompts, token traces |
-| `figures/`, `paper/UNIKV-MEASUREMENT/` | Figures and paper source |
+| `figures/` | Figures as published, regenerable from `scripts/make_fig*.py` |
 | `llama.cpp` (submodule) | The fork the measurements run against |
 
 Two repositories, both needed:
 
-- Harnesses and data — this repository, commit `19a9f9a`
-- The fork — `llama.cpp-unikv`, commit `7c2b27d`, branched from upstream
-  `9725a313b`
+- Harnesses and data — this repository
+- The fork — `llama.cpp-unikv`, pinned as a submodule at commit `7c2b27d`,
+  branched from upstream `9725a313b`
 
 ## What is *not* here, and why
 
@@ -53,7 +53,7 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 | Claim | Harness | Data | Analysis |
 |---|---|---|---|
 | Eq. (1)–(2), γ, δ, Fig. 1 | `run_b2_cooled.py`, `make_fig5_recall_cost.py` | `stress_results/b2_isochronal_both_modes.csv` | `b2_cooled/B2_analysis.txt`; fit spec in `b2_cooled/REGRESSION_SPEC.txt` |
-| Isochronal design; confounded long-run slope | `run_recall_cost_isochronal.py` | `stress_results/recall_cost_isochronal.csv`, `recall_cost_steps_A_p3_long.csv` | `recall_cost/recall_cost_analysis.txt` |
+| Isochronal design; confounded long-run slope | `run_recall_cost_isochronal.py` | `stress_results/recall_cost_steps_A_p3_long.csv`, `recall_cost_isochronal.csv` | `recall_cost/recall_cost_analysis.txt` — the design and the confounded slope stand, but its γ and δ are superseded by the B2 row above |
 | Device-visible tier; counterbalanced A/B failure | `run_b1_ceiling.py`, `run_b1_interleaved.py` | `stress_results/b1_device_tier_ceiling.csv`, `b1_interleaved_ab.csv` | `b1_gpu_tier/B1_triage.txt`, `B1_verification_and_ceiling.txt` |
 | Retrieval + 32-token continuation (Table 2) | `run_quality_arms_unified.py` | `quality_results/quality_arms_unified.csv` | `quality_unified/quality_arms_analysis.txt` |
 | H2O comparator fidelity | `run_quality_probe.py` | `quality_results/quality_probe.csv` | `h2o_comparator/h2o_analysis.txt` |
@@ -64,7 +64,7 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 | Scratch term, ceilings, ubatch linearity, prefill non-effect (Table 6, Fig. 2) | `run_f4_phaseA.py`, `make_fig6_capacity.py` | `stress_results/f4_a1_ubatch_sweep.csv` | `f4_phaseA/F4_A1_ubatch_sweep.txt`, `ubatch_prefill_tradeoff.txt` |
 | Upstream completes the 65k workload (Table 7) | `run_capacity_workload.py` | `stress_results/f4_a2_continuation_arms.csv`, `f4_a3_flash_attn_capacity.csv` | `f4_phaseA/F4_A2_continuation_arms.txt`, `F4_A3_flash_attention_capacity.txt` |
 | Allocation vs. execution; advisory-budget ratios | `run_capacity_probe.py` | `stress_results/capacity_probe.csv` | `capacity_probe/capacity_analysis.txt`; unit correction in `CORRECTION_2026-08-07_budget_units.txt` |
-| Policy comparison, exactness premium (Table 8) | `run_policy_compare_cooled.py` | `stress_results/r3_policy_compare_cooled_master.csv` | `r3_policy_compare/policy_compare_analysis.txt` |
+| Policy comparison, exactness premium (Table 8) | `run_b2_cooled.py` | `stress_results/b2_policy_block.csv` | `b2_cooled/B2_analysis.txt` — supersedes `r3_policy_compare/policy_compare_analysis.txt` and its `r3_policy_compare_cooled_master.csv`, which lack the device-visible arm |
 
 Where two analysis files are listed, the second corrects the first. Those entries
 are kept deliberately: the 71/29 decomposition, the advisory-budget ratios and
@@ -74,9 +74,15 @@ retained with their reason in `stress_results/SUPERSEDED.md`.
 
 ## License
 
-**Not yet chosen — must be set before the artifact is archived.** Zenodo requires
-a license, and the default without one is all-rights-reserved, which would make
-the artifact unusable by anyone who reads the paper. MIT for the harnesses is the
-natural choice since it matches the fork; CC-BY-4.0 for the result files is the
-usual companion. The fork itself inherits llama.cpp's MIT license and retains its
-attribution regardless.
+Harnesses under `scripts/`: MIT (`LICENSE`). Result files, analyses and figures:
+CC-BY-4.0 (`LICENSE-DATA`). The `llama.cpp` fork inherits upstream's MIT license
+and retains its attribution.
+
+## Not included
+
+The paper source is deliberately not in this repository. The artifact exists to
+make the measurements checkable, which the data and harnesses do on their own;
+publishing draft history of the manuscript alongside them would expose
+superseded prose without the reasoning that retired it, and would complicate
+anonymous review. Superseded *measurements*, by contrast, are kept here on
+purpose, each with a header saying what replaced it and why.

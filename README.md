@@ -6,7 +6,8 @@ Alp Demir Ekinci — Sabancı University
 
 This repository is the artifact for a measurement paper about what happens to
 KV-cache policy when the interconnect disappears. It contains the measurement
-harnesses, the raw results, the per-experiment analyses, and the paper source.
+harnesses, the raw results, and the per-experiment analyses behind every
+number in the paper.
 
 ## The short version
 
@@ -50,7 +51,7 @@ context is non-resident.
 | `scripts/` | Measurement harnesses and figure generators |
 | `stress_results/`, `alpha_results/`, `quality_results/` | Raw result CSVs |
 | `artifacts/` | Per-experiment analyses, run logs, prompts, token traces |
-| `figures/`, `paper/` | Figures and paper source |
+| `figures/` | Figures as published, regenerable from `scripts/make_fig*.py` |
 | `llama.cpp` | Submodule: the fork the measurements run against |
 
 `ARTIFACT.md` maps every quantitative claim in the paper to the harness, the data
@@ -95,6 +96,6 @@ than the concept DOI.
 
 ## License
 
-Harnesses and paper source: MIT (`LICENSE`). Result files and analyses:
+Harnesses: MIT (`LICENSE`). Result files and analyses:
 CC-BY-4.0 (`LICENSE-DATA`). The `llama.cpp` fork inherits upstream's MIT license
 and retains its attribution.
