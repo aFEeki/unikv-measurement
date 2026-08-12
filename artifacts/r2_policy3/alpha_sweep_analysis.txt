@@ -1,0 +1,59 @@
+Policy-3 recall-cost alpha sweep — R2, 35 runs (7 alpha x 5 trials), C=1024,
+512-prompt + 2048 decode, -fa off, randomized-block seed 20260710.
+Data: alpha_results/p3_alpha_sweep_master.csv, p3_alpha_timing_log.csv.
+
+RAW PER-ALPHA MEANS (tok/s) — FLAT, non-monotonic:
+  alpha 0    : 23.52 +- 1.65
+  alpha 0.25 : 23.96 +- 1.62
+  alpha 0.5  : 24.42 +- 1.29
+  alpha 0.75 : 24.74 +- 2.18
+  alpha 1    : 23.44 +- 1.36
+  alpha 1.5  : 24.62 +- 1.85
+  alpha 2    : 23.21 +- 1.08
+All 35 runs lossless (2048 tokens), all < 58 ceiling.
+
+WHY IT IS FLAT — signal below noise, not a bug:
+1. Thermal drift this session is MONOTONIC (heat-soaked M4), not the §3 U-shape:
+   tok/s vs run-position slope = -0.072 /run => -2.5 tok/s across the sweep;
+   first-5-runs mean 25.44 vs last-5 21.38. Monotonic drift is NOT cancelled by
+   block-averaging the way a U-shape is.
+2. This seed anti-correlated alpha with run position: mean run-position by alpha
+   = {a0:18.6, a0.25:16.6, a0.5:25.0, a0.75:19.8, a1:21.6, a1.5:13.4, a2:11.0}.
+   High-alpha ran earlier/cooler, low/mid-alpha later/hotter -> the thermal
+   penalty partly offsets the alpha penalty in raw means.
+3. The expected alpha effect is genuinely SMALL. Injected delay is additive:
+   K = sum_over_steps(n_spilled) * per_cell_bytes / 64 GB/s
+     = (1536*1537/2 cells) * 128 KiB / 64e9 = 2414 ms per unit-alpha.
+   So alpha=1 adds ~2.41 s on a ~72 s base decode = ~3.4%; alpha=2 ~6.7%.
+   That is BELOW the thermal noise (std ~6%, drift ~11%) on this device.
+
+Position-detrended (linear) residual by alpha still noisy/non-monotonic
+  (a0 -0.42, a0.25 -0.12, a0.5 +0.94, a0.75 +0.88, a1 -0.29, a1.5 +0.30,
+   a2 -1.28): a faint hint (a2 lowest) but not a clean trend, because the drift
+  is not perfectly linear and the effect is small.
+
+INTERPRETATION: the recall-cost delay at unified-memory-realistic calibration is
+small by design (recall is nearly free -- the thesis), and a heat-soaked
+sequential sweep cannot resolve a ~3.4%/unit effect against ~11% thermal drift.
+This is NOT the same situation as the old policy-1 sweep, whose modeled cost was
+larger per event.
+
+INJECTION VERIFIED (cooldown-paired A/B, 200s idles, injection_verify.csv):
+  alpha=0: 69045, 69039, 69141 ms  mean 69075  (std ~50 ms)
+  alpha=2: 75984, 76217, 76098 ms  mean 76100  (std ~120 ms)
+  delta = +7025 ms vs +4834 ms idealized sleep. The ~2.2 s excess is real
+  blocking-regime overhead (per-step synchronize() drain + nanosleep granularity
+  over ~1536 spilling steps), i.e. the non-blocking->blocking transition, not a
+  bug. In tok/s: alpha=0 29.65 -> alpha=2 26.91, clean monotone ~1.37 tok/s per
+  unit-alpha (~4.6%). CONCLUSION: the delay lands correctly; the flat 35-run
+  sweep was purely thermal masking. With 200 s cooldowns run-to-run variance
+  drops from +-1.5 tok/s to +-0.05 tok/s and the trend is cleanly resolvable
+  RIGHT NOW (no need for a cold device).
+
+DECISION PATHS FOR JUDGMENT (pending verification):
+  (a) cooldown re-run on a COOL device (fixed inter-run idle) to expose the small
+      real trend cleanly -- best for a defensible Fig 4, ~2 h.
+  (b) reframe Fig 4 around the finding itself: under honest per-step recall
+      calibration the transfer cost is small and flat on unified memory (thesis-
+      consistent), with A100 as the measured PCIe anchor (optional arm).
+  (c) NOT recommended: inflating the calibration to manufacture a steeper trend.

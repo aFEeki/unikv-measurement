@@ -1,0 +1,4 @@
+budget_mib,ctx,decode_tokens,device_kib_per_ctx_token,device_total_mib,duration_s,fa_requested,flash_attn,gpu_oom_lines,kv_mib,model_mib,n_batch,n_ubatch,outcome,policy,prefill_ms,prompt_tokens,rc,role,scratch_kib_per_ctx_token,scratch_mib,tag,tok_per_sec,x_budget
+17179.89,4096,32,199.0,5481.3,215.6,off,disabled,0,512.0,4685.3,512,512,COMPLETES,1,213770.93,65536,0,rolling window (context shift),71.0,284.01,A2_p1_c4096,27.68,0.319
+17179.89,4096,32,263.12,5737.8,294.8,off,disabled,0,512.0,4685.3,512,512,COMPLETES,4,293244.46,65536,0,H2O fixed-budget eviction,135.12,540.49,A2_p4_c4096,31.625,0.334
+17179.89,81920,32,136.28,15587.8,620.9,off,disabled,0,10240.0,4685.3,512,64,COMPLETES,0,614388.69,65536,0,"stock, fa OFF, ubatch 64 (lossless, whole prompt resident)",8.28,662.5,A2_p0_c81920_ub64,5.863,0.907

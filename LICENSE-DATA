@@ -1,0 +1,23 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Copyright (c) 2026 Alp Demir Ekinci
+
+The measurement results and analyses in this repository -- specifically the
+contents of stress_results/, alpha_results/, quality_results/, artifacts/, and
+figures/ -- are licensed under the Creative Commons Attribution 4.0
+International License.
+
+You are free to share and adapt this material for any purpose, including
+commercially, provided you give appropriate credit, provide a link to the
+license, and indicate if changes were made.
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
+Summary: https://creativecommons.org/licenses/by/4.0/
+
+Attribution should cite the paper and the archived version DOI of this
+artifact.
+
+Note on generated text: files under artifacts/ include model output produced by
+Llama 3.1 8B Instruct during the measurements. That output is retained as
+experimental evidence and is subject to the Llama 3.1 Community License; it is
+not claimed as original work by the copyright holder above.

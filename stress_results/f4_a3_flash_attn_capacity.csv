@@ -1,0 +1,3 @@
+budget_mib,ctx,decode_tokens,device_kib_per_ctx_token,device_total_mib,duration_s,fa_requested,flash_attn,gpu_oom_lines,kv_mib,model_mib,n_batch,n_ubatch,outcome,policy,prefill_ms,prompt_tokens,rc,scratch_kib_per_ctx_token,scratch_mib,tag,tok_per_sec,x_budget
+17179.89,65536,,132.04,13135.8,3.6,on,enabled,0,8192.0,4685.3,512,512,PROMPT_TOO_LONG,0,,65536,1,4.04,258.5,A3_p0_fa_on_c65536,,0.765
+17179.89,73728,32,131.59,14159.8,497.6,on,enabled,0,9216.0,4685.3,512,512,COMPLETES,0,494512.41,65536,0,3.59,258.5,A3_p0_fa_on_c73728,15.986,0.824

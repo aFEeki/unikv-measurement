@@ -1,0 +1,103 @@
+All passkey arms in ONE harness at ONE batch configuration
+==========================================================
+Run 2026-08-04. Harness: scripts/run_quality_arms_unified.py
+Data: quality_results/quality_arms_unified.csv
+Logs: artifacts/quality_unified/logs/gen_<arm>.txt (+ per-arm step CSVs and
+      sampled-token-ID dumps)
+Addresses review item M5.
+
+QUESTION
+--------
+Section 5.7 claims "all four arms run with flash attention disabled, so the sink
+is the sole difference between the eviction runs", and that StreamingLLM evicts
+"with the same number of shifts" as the naive window. The reviewer showed the
+arms had been assembled across harnesses that disagreed on flash attention
+(run_quality_probe_A.py runs -fa on), on batch tiling (256 vs 512), and even on
+what the shift_events column MEANS (a per-call flag in one, a count in the
+other), so at least one of those two sentences could not be true as written.
+Re-run everything in one harness and check both sentences.
+
+PROTOCOL
+--------
+Five arms, one process sequence, 60 s cooldown between arms. Identical prompt
+(3834 tokens, passkey 48291 ending at position ~219), GEN=32, seed 123, greedy
+(temp 0), -fa off, -fit off, -b 256 -ub 256 on EVERY arm. Per-arm demotion count
+uses ONE definition throughout: the number of decode calls whose shift_events
+flag fired (= spill events for policy 3, shift events for policy 1).
+
+flash_attn and n_batch/n_ubatch are parsed back out of each arm's own log; the
+harness fails if they differ across arms.
+
+RESULT — VERDICT: PASS
+----------------------
+  arm                      C  pol sink  demotions  retained  devKV   dwr    passkey
+  ref_p0_c4096          4096    0    0          0         0  512 MiB 0.818  RETRIEVED
+  idle_p3_c4096         4096    3    0          0         0  512 MiB 0.818  RETRIEVED
+  unikv_p3_c1024        1024    3    0         42      2841  128 MiB 0.818  RETRIEVED
+  streamingllm_p1_c1024 1024    1    4         42         0  128 MiB 0.321  LOST
+  naive_p1_c1024        1024    1    0         42         0  128 MiB 0.125  LOST
+
+  flash_attn = disabled on all five (read from each arm's log).
+  n_batch = n_ubatch = 256 on all five.
+  Sampled token IDs IDENTICAL across ref / idle / unikv (md5 fc78f54189c4...).
+
+BOTH DISPUTED SENTENCES NOW CHECK OUT
+-------------------------------------
+1. "All arms run with flash attention disabled" — TRUE, verified per arm from
+   the run logs rather than from harness source.
+2. "The sink is the sole difference between the eviction runs" — TRUE: both
+   eviction arms record exactly 42 demotion calls under one definition, at the
+   same batch tiling, in the same block. The only configured difference is
+   UNIKV_SINK (4 vs 0), and it moves the coherence proxy 0.125 -> 0.321 while
+   leaving retrieval unchanged (both lose the passkey). The sink diagnosis from
+   the earlier work is reproduced under a controlled comparison.
+
+The 42 also reconciles the two numbers the review found in the repository: 42 is
+the COUNT of demoting calls (what spill_gate.csv recorded), while the 1 in
+quality_probe_A.csv was that harness reading a per-call flag as if it were a
+count. Same runs, different column semantics. The new CSV carries the count.
+
+THE PUBLISHED OUTPUTS REPRODUCE EXACTLY
+---------------------------------------
+The generated text of every re-run arm is BYTE-IDENTICAL to the corresponding
+row of the published quality_probe_A.csv table, despite that table's flash
+attention being ON:
+  ref_p0_c4096          == control_p1_bigC   (108 chars, 22 words)
+  streamingllm_p1_c1024 == StreamingLLM_k4   (124 chars, 28 words)
+  naive_p1_c1024        == naive_rolling     (127 chars, 32 words)
+So the flash-attention confound did not, in fact, change any output in this
+table — it was a threat to the claim's validity, not to its conclusion, exactly
+as the reviewer allowed ("the conclusion survives"). It is now closed by
+construction rather than by argument.
+
+NB on the coherence proxy: distinct_word_ratio in the published table is
+CASE-SENSITIVE. This harness records both — distinct_word_ratio (case-sensitive,
+0.818 / 0.321 / 0.125, matching the paper) and distinct_word_ratio_casefold
+(0.773 / 0.286 / 0.125). Use the case-sensitive column for continuity with
+Table 2. Neither is a real coherence metric; both are loop indicators.
+
+BONUS: THE CLEANER NO-OVERHEAD DATUM (review M8)
+-------------------------------------------------
+Arms 1 and 2 are stock vs UniKV-idle at C=4096 in the same harness, same block,
+same prompt, 60 s apart:
+    stock 34.735  vs  UniKV-idle 34.668 tok/s   -> 0.19%
+This is the paired datum M8 asked for, and it is tighter than the 0.49% the
+reviewer computed from spill_gate.csv (34.999 vs 34.826). Combined with the
+mechanism argument (idle policy 3 takes the byte-identical graph path), it
+supports "no overhead measurable above thermal noise". It is still ONE pair, not
+a distribution — do not quote it as a measured overhead of 0.19%, quote it as
+below the resolution of a single pair on this device.
+
+LIMITS
+------
+- The tok/s figures in this table are INSTRUMENTED (UNIKV_LOG is on for the
+  demotion counts, which adds a synchronize() at both ends of every decode call)
+  and use -b/-ub 256 rather than the 512 of the throughput blocks. They are not
+  comparable to the headline throughput numbers and should not be quoted as
+  such; they are here only to confirm no arm breaches the 58 tok/s ceiling.
+- One prompt, one needle position, 32 decoded tokens. This harness fixes the
+  provenance of the existing table; it does not answer D6 (needle-position x
+  context-length sweep), which remains open.
+- The retrieval result is guaranteed by construction for the lossless arms (the
+  conservation identity), as D6 notes. The informative content is the CONTRAST
+  with the two eviction arms at identical C and identical demotion count.

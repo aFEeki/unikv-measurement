@@ -1,0 +1,186 @@
+H2O fixed-budget eviction comparator (UNIKV_POLICY=4)
+======================================================
+Run 2026-08-04. Addresses review item R3 / D1 / C3 — "not one system from the
+related work is evaluated".
+Implementation: llama.cpp/src/llama-unikv-h2o.h, llama-graph.cpp (score
+extraction), llama-kv-cache.cpp (unikv_h2o_evict), llama-context.cpp (wiring).
+Data: quality_results/quality_arms_unified.csv,
+      stress_results/r3_policy_compare_cooled_master.csv
+Traces: artifacts/quality_unified/logs/h2o_trace_h2o_p4_c1024.csv
+
+HEADLINE
+--------
+H2O RETRIEVES THE PASSKEY. The paper's quality advantage holds against a naive
+rolling window and against StreamingLLM; it does NOT hold against a competent
+fixed-budget evictor on this probe. What survives is a narrower and different
+claim: exactness, not retrieval.
+
+WHAT WAS IMPLEMENTED
+--------------------
+H2O (Zhang et al., NeurIPS 2023): accumulate per-token attention mass across all
+queries seen so far; at overflow keep the most recent `n_recent` tokens plus the
+highest-mass tokens among the rest, evict the remainder. Budget split is the
+paper's default, half recent and half heavy hitters (UNIKV_H2O_RECENT overrides).
+
+In-fork, so it shares the binary, model (Llama-3.1-8B Q4_K_M), prompts, seed
+(123), greedy decoding, batch tiling and thermal protocol with every other arm.
+Attention probabilities are read from the explicit softmax, reduced INSIDE the
+graph to one [1, n_kv] vector per layer (a transpose plus sum_rows), and folded
+into a per-cell running total after each graph compute. Eviction removes cells
+directly and does NOT call seq_add, so survivors keep their absolute positions:
+RoPE stays exact and the position-gap failure that affected policy 1 cannot
+arise. Survivors are non-contiguous in both cell index and position, which
+find_slot handles because it tests cells one at a time when cont=false.
+
+TWO DEVIATIONS FROM THE PAPER, BOTH FORCED, BOTH DISADVANTAGING H2O
+--------------------------------------------------------------------
+1. H2O is defined PER HEAD. A llama.cpp KV cell is shared by every layer and
+   head, so evicting a cell removes that token everywhere; importance must be
+   aggregated over heads and layers into a single score per token. Any
+   implementation on a shared-cell cache must do this. It makes the policy
+   strictly LESS selective than per-head H2O, so it understates H2O if anything.
+2. Accumulated mass is a running sum, as the paper specifies, not an average, so
+   newly admitted tokens start at zero and are protected only by the recent
+   window — also as in the paper.
+
+Neither deviation was chosen to weaken the comparator. Both are noted because a
+reviewer will ask, and because the result went in H2O's favour anyway.
+
+CORRECTNESS EVIDENCE (this is not a strawman)
+----------------------------------------------
+1. INERT WHEN IDLE. At C=4096 with a 512-token prompt (no overflow), policy 4
+   emits a token-ID-identical sequence to stock policy 0. The score-extraction
+   machinery does not perturb the computation.
+2. BEATS THE NAIVE WINDOW AT THE SAME BUDGET — the pre-registered sanity check.
+   At C=1024 on the passkey probe, the naive window loses the passkey and H2O
+   retrieves it.
+3. THE RANKING IS SEMANTICALLY CORRECT. From the survivor trace (1023 resident
+   cells, budget C=1024):
+       pos     0   score 2245263.2   <- attention sink, 150x the next token
+       pos   199   score   14346.1   <- passkey
+       pos    30   score   12322.6
+       pos   218   score   11965.8   <- passkey
+       pos   207   score    6277.4
+       pos    44   score    5519.0
+   The passkey tokens are the #2 and #4 heavy hitters in the entire cache, and
+   the position-0 sink dominates by two orders of magnitude — exactly the
+   behaviour the H2O and StreamingLLM literature describes. A misread signal
+   could not produce that ordering.
+4. THE BUDGET IS REAL. 1023 of 1024 cells resident, 512 in the recent window and
+   511 heavy hitters, 231 survivors drawn from the first 512 prompt positions.
+   H2O is genuinely retaining old high-attention tokens, not approximating a
+   window.
+5. Two cells of 1023 carry small negative accumulated sums (min -6.4 against a
+   median of 233) — float noise in the in-graph reduction, immaterial to any
+   ranking, recorded rather than swept up.
+
+QUALITY RESULT — one harness, one batch config, flash attention off on all six
+-------------------------------------------------------------------------------
+  arm                      C   pol  demotions  devKV    dwr    passkey
+  ref_p0_c4096          4096     0          0  512 MiB  0.818  RETRIEVED
+  idle_p3_c4096         4096     3          0  512 MiB  0.818  RETRIEVED
+  unikv_p3_c1024        1024     3         42  128 MiB  0.818  RETRIEVED
+  streamingllm_p1_c1024 1024     1         42  128 MiB  0.321  LOST
+  naive_p1_c1024        1024     1         42  128 MiB  0.125  LOST
+  h2o_p4_c1024          1024     4         42  128 MiB  0.667  RETRIEVED
+
+All six arms take 42 demotion events — the same overflow schedule — at the same
+128 MiB device KV budget for the four C=1024 arms.
+
+The generated text tells the story more precisely than the retrieval flag:
+
+  reference   "48291. Remember it. 48291 is the pass key. (Note: The pass key is
+               repeated many times in the text, but it is"
+  UniKV       identical to the reference, at the TOKEN-ID level (md5 fc78f54189c4)
+  H2O         "48291. Remember it. 48291 is the pass key. (The pass key is
+               48291.) \n\nThe pass key is 48291"   -- diverges from the reference
+  StreamingLLM"the password. The password is the key to the pass. ..."  -- no key
+  naive       "the pass key is the pass key is ..."                     -- no key
+
+So the ordering is: naive breaks the mechanism, StreamingLLM fixes the mechanism
+but loses the information, H2O keeps the information but not the computation, and
+UniKV keeps both.
+
+WHAT THE PAPER HAS TO CHANGE
+-----------------------------
+The current framing — UniKV retrieves where eviction loses — is true only against
+window-based eviction. Against H2O it is false. The defensible claim is:
+
+  Fixed-budget eviction can retain a specific fact if that fact attracts
+  attention while it is still resident. What it cannot do is reproduce the
+  computation that would have happened without eviction. UniKV's output is
+  token-identical to the no-eviction reference; H2O's is not, despite recovering
+  the same fact.
+
+That is a claim about EXACTNESS, which is what Proposition 1 is actually about
+(lossless retention), and it is the honest form of the contribution. It also
+means the passkey probe no longer separates UniKV from good prior art — only the
+token-identity check does. Review item D6 already observed that the probe is
+guaranteed for a lossless policy by construction; this result shows it is also
+achievable for a lossy one, which removes it as a discriminator entirely.
+
+THROUGHPUT RESULT — 8 arms x 3 trials, ONE cooled randomized block
+-------------------------------------------------------------------
+512-token prompt + 2048-token decode budget, -fa off on every arm (verified per
+row from each run's own log), 200 s cooldowns, randomized order. All 24 runs
+rc=0, all under the 58 tok/s ceiling. Demotion counts and token counts are
+identical across all three trials of every arm.
+
+  arm         C     policy  tokens        demotions  devKV     tok/s    sd
+  p0_c1024    1024  stock   512 (halts)           0  128 MiB   42.27  0.16
+  p1_c1024    1024  window  2048                  0  128 MiB   38.52  0.08
+  p4_c1024    1024  H2O     2048               1535  128 MiB   41.41  0.09
+  p3_c1024    1024  UniKV   2048               1535  128 MiB   29.05  0.06
+  p0_c2048    2048  stock   1536 (halts)          0  256 MiB   40.56  0.07
+  p1_c2048    2048  window  2048                  0  256 MiB   38.45  0.01
+  p4_c2048    2048  H2O     2048                511  256 MiB   39.19  0.01
+  p3_c2048    2048  UniKV   2048                511  256 MiB   34.64  0.14
+
+(The whole block was re-run with H2O included rather than splicing the new arms
+into the previous 6-arm block. Assembling a table across blocks is exactly the
+error review item M5 identified, and it would have been self-inflicted here.
+These 24 runs supersede the earlier 18-run block in
+artifacts/r3_policy_compare/policy_compare_analysis.txt; the two agree to within
+0.3 tok/s on the shared arms.)
+
+H2O IS THE FASTEST CONTINUATION POLICY AT BOTH BUDGETS
+-------------------------------------------------------
+  C=1024:  UniKV is 29.8% slower than H2O (29.05 vs 41.41)
+  C=2048:  UniKV is 11.6% slower than H2O (34.64 vs 39.19)
+
+H2O also beats the naive rolling window (+7.5% at C=1024, +1.9% at C=2048),
+which is not obvious and is worth one sentence in the paper: policy 1 calls
+seq_add on every overflow, re-encoding RoPE across the whole cache, while H2O
+drops cells outright and touches no positions. The "cheap" baseline is the more
+expensive mechanism.
+
+So the exactness premium — what the paper is really selling — is about 30% of
+throughput at C=1024 against a comparator that ALSO retrieves the passkey, on a
+device where the theory says the transfer term is zero. That is the number the
+paper should quote, in place of any comparison against the halting baseline.
+
+A REVIEWER WILL ASK WHY H2O SUCCEEDS HERE
+------------------------------------------
+Because the needle attracts attention during prefill. The passkey is a rare,
+high-information token in repetitive filler, so it accumulates mass well above
+the filler median long before the closing question is seen. H2O's known failure
+mode — it must decide what matters before it sees the query — is not exercised by
+this prompt. A probe designed to defeat accumulated-attention selection (a needle
+that is NOT attended until the question arrives) would likely separate them. That
+would be a fair experiment to run; it would also be transparently a probe chosen
+to make the comparator fail, and should be presented as a targeted stress test
+rather than as the headline if it is run at all.
+
+LIMITS
+------
+- One probe, one needle position, one budget split (512/512). The heavy/recent
+  split is H2O's default but is a free parameter; it was not swept.
+- Aggregating importance across heads and layers is a real departure from the
+  paper (see deviation 1). A per-head implementation would need a per-head cache
+  layout, which llama.cpp does not have.
+- SnapKV, the other candidate, was not implemented. It compresses once at the end
+  of prefill using the last window of queries; on this probe it would face the
+  same question H2O did and the same answer would likely apply.
+- No cross-stack comparator (vLLM CPU swap, FastDecode-class), per the explicit
+  scope decision: a different tokenizer and different kernels would confound the
+  comparison. The taxonomy in Section 2 still contains twelve unevaluated systems.

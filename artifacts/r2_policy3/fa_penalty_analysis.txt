@@ -1,0 +1,40 @@
+Flash-attention setting audit + FA-off penalty (R2 task 1). Evidence from run
+logs (llama_context: flash_attn = enabled/disabled), not harness source alone.
+
+FA PER ARM
+  Fig-1 baseline scaling (§V-B)          FA ON   (m4pro_baseline logs: enabled)
+  Run-1 p0 baseline C=1024 (42.5)        FA OFF  (gen_r1_p0_c1024: disabled)
+  Run-1 p0 baseline C=2048 (40.2)        FA OFF
+  Run-1 p3 UniKV  C=1024 / C=2048        FA OFF  (policy 3 requires it)
+  Run-3 p0 baseline C=4096               FA OFF
+  Run-3 p3-idle   C=4096                 FA OFF
+  alpha-sweep (all 56 runs)              FA OFF  (policy 3 requirement; all ran)
+  §V-G spill-gate p0/p1/p3               FA OFF
+  §V-G 4-arm quality_probe_A (as-written) FA ON  (retention/SLM/naive/control)
+
+PIVOTAL: the paired baselines (Run-1 p0, Run-3 p0) were run FA-OFF, MATCHED to
+UniKV. Nothing to re-run; the policy comparisons are internally FA-consistent.
+
+FA-OFF PENALTY (new run: C=4096 p0 baseline, FA-on vs FA-off, cooled 200 s,
+2 pairs, seed 123, temp 0; fa_penalty_c4096.csv):
+  FA-on  45.74 tok/s  [45.836, 45.643]
+  FA-off 40.07 tok/s  [40.225, 39.915]
+  FA-off penalty = 12.4% (5.67 tok/s). All < 58.
+
+DECOMPOSITION -- IMPORTANT CORRECTION to the "42.5->28.5 = FA penalty + recall"
+framing: 42.5 (Run-1 p0 C=1024) is ALREADY FA-off, matched to the 28.45 UniKV
+arm. So the 42.5 -> 28.45 gap is ENTIRELY recall cost; there is NO FA penalty
+hidden inside it. The FA-off penalty is a SEPARATE, additional layer, relative to
+a vanilla FA-ON baseline:
+    vanilla FA-on baseline   45.7 tok/s   (C=4096)
+      -> FA-off baseline     40.1 tok/s   = 12.4% FA-off penalty (UniKV needs FA off)
+      -> FA-off UniKV spilling             = recall cost (measured directly by the
+                                             paper's own FA-matched p0-vs-p3 gap)
+So the paper's baseline comparison already controls FA (both off) and isolates
+recall; the 12.4% is disclosed separately for a reader comparing UniKV against a
+stock FA-on llama.cpp. Caveat: penalty measured at C=4096; the FA kernel cost
+scales with context, so at C=1024 the penalty is somewhat smaller.
+
+BOTTOM LINE: NOTHING CHANGES in the committed numbers. Paired baselines were
+FA-matched, so no re-run. The only new value is the 12.4% FA-off penalty, which
+is additive disclosure, not a correction.

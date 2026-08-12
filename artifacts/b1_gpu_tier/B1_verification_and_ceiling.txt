@@ -1,0 +1,145 @@
+*** PART 1 (the interleaved A/B) SUPERSEDED 2026-08-07 by B2 Block 2.
+    The uncooled A/B was biased in BOTH directions: it overstated the
+    device-visible speedup (+46.5% vs the protocol +25.9%) and understated the
+    exactness premium (+7.77% vs the protocol +11.42% at C=1024). Do not quote
+    Part 1's numbers.
+    PART 2 (the ceiling probe) STANDS: B2 did not re-measure it. The
+    device-visible ceiling of 81920-90112 cells, the full charging of the tier
+    against the device, and the CPU-pinned tier's absence of any device-side
+    ceiling are all still current. ***
+
+B1 — interleaved verification and the device-visible ceiling
+============================================================
+2026-08-06. Harnesses: scripts/run_b1_interleaved.py, scripts/run_b1_ceiling.py
+Data: stress_results/b1_interleaved_ab.csv, b1_device_tier_ceiling.csv
+Logs: artifacts/b1_gpu_tier/{logs,ceiling_logs}/
+Follows: artifacts/b1_gpu_tier/B1_triage.txt (bucket call (a))
+
+Neither block is cooled. The interleaved one substitutes COUNTERBALANCING for
+cooling, so its within-round differences are drift-immune while its absolute
+levels are not protocol numbers. The ceiling block produces categorical outcomes
+(completes / refused), which thermal state does not change.
+
+PART 1 — THE PREMIUM AGAINST H2O HOLDS, AND IT IS THE TIGHTEST NUMBER HERE
+---------------------------------------------------------------------------
+Three arms at C=1024, 1536 decode, -fa off, uninstrumented, in rotated order
+(ABC, BCA, CAB, CBA), n=4 each.
+
+  arm                        n    mean     sd     range
+  p3 CPU-pinned            4    25.22   3.24   23.04 - 30.03
+  p3 device-visible        4    36.60   1.66   34.87 - 38.22
+  H2O                      4    39.45   2.16   37.36 - 41.65
+
+  within-round paired differences:
+    H2O vs device-visible      + 7.77%  +/- 2.08   (+10.1 +7.2 +8.5 +5.2)
+    device-visible vs CPU-pin  +46.50%  +/- 15.41  (+25.9 +61.6 +44.5 +54.1)
+    H2O vs CPU-pinned          +57.69%  +/- 14.39  (+38.7 +73.2 +56.8 +62.1)
+
+The sub-10% exactness premium is CONFIRMED: +7.77% +/- 2.08, every round inside
+[5.2, 10.1]. This is the number the extended version hangs on and it is the most
+stable comparison in the set.
+
+THE DEVICE-VISIBLE SPEEDUP IS NOT +24%, AND IS NOT A SINGLE NUMBER
+-------------------------------------------------------------------
+The triage smoke said +24%; counterbalanced measurement says +46.5% +/- 15.4.
+The per-arm ranges explain the discrepancy and are the more interesting result:
+
+  CPU-pinned      30.03 -> 23.04 across the session   (-23%, 30% spread)
+  device-visible  37.81 -> 35.50                      ( -6%, 10% spread)
+  H2O             41.65 -> 37.36                      (-10%, 11% spread)
+
+The CPU-pinned arm is far more thermally sensitive than the other two, because
+CPU work throttles harder than GPU work on this device. It is not merely slower;
+it is less predictable. That also explains why the two comparisons have such
+different stability: H2O against device-visible compares two GPU-resident arms
+with similar thermal behaviour and lands at +/-2.08, while anything involving the
+CPU-pinned arm inherits its throttling and lands at +/-15.
+
+Consequence for reporting: the device-visible speedup should be given as a range
+or measured cooled, not quoted as a point value. B2 pins it.
+
+PART 2 — WHERE DEVICE-VISIBILITY MEETS THE WALL
+------------------------------------------------
+UNIKV_SPILL_CAP walked upward at C=1024, both modes, paired.
+
+  mode             cap cells   cap MiB   MTL0 free   unaccounted   tok/s   outcome
+  device-visible       16384      2048        9263          2048   37.89   completes
+  device-visible       32768      4096        7215          4096   38.41   completes
+  device-visible       49152      6144        5167          6144   38.32   completes
+  device-visible       65536      8192        3119          8192   37.79   completes
+  device-visible       81920     10240        1071         10240   36.73   completes
+  device-visible       90112     11264           -             -       -   GPU OUT OF MEMORY
+  CPU-pinned           16384      2048       11311             0   22.93   completes
+  CPU-pinned           32768      4096       11311             0   21.74   completes
+  CPU-pinned           49152      6144       11311             0   21.94   completes
+  CPU-pinned           65536      8192       11311             0   22.21   completes
+  CPU-pinned           81920     10240       11311             0   22.73   completes
+  CPU-pinned           90112     11264       11311             0   22.59   completes
+  CPU-pinned           98304     12288       11311             0   22.71   completes
+  CPU-pinned          131072     16384       11311             0   22.38   completes
+
+Two clean facts:
+
+1. The device-visible tier is charged in full against the device. Free memory
+   falls by exactly the cap at every step, and the tier shows up as
+   `unaccounted` because it sits outside the ggml scheduler's tracked
+   categories. The ceiling is between 81920 and 90112 cells, i.e. 10.2-11.3 GiB
+   of tier, which matches the headroom arithmetic (16383 - 4685 model - 128 KV -
+   258 compute = 11312 MiB) essentially exactly.
+
+2. The CPU-pinned tier is invisible to the device. Free memory is 11311 MiB at
+   EVERY capacity, including a 16 GiB tier on a 24 GB machine, and there is no
+   device-side ceiling at all. This is precisely what the pin buys, stated as a
+   measurement rather than as a design intention.
+
+Two details worth keeping:
+
+- The failure is again GPU_OOM, not an allocation failure: 11264 MiB of tier
+  ALLOCATES and is then refused at execution. Finding 4's central observation
+  reproduces in a configuration it was not derived from, which is the strongest
+  evidence for it so far.
+- Unlike the ubatch sweep, there is no slow-then-refused band here: throughput is
+  flat to the wall (37.89 at 2 GiB, 36.73 at 10 GiB, a 3% decline) and then the
+  configuration simply stops working. The "approach the budget and it degrades"
+  behaviour seen in the A1 sweep is specific to configurations where the
+  COMPUTE SCRATCH is what grows; a large static buffer does not behave that way.
+
+WHAT THE TRADE ACTUALLY IS
+---------------------------
+Putting the two halves together, device-visibility is not a free improvement and
+it is not a small one either. It is a move along a curve:
+
+  CPU-pinned tier      ~25 tok/s (thermally unstable, 30% session spread)
+                       no device-side capacity limit; tier bounded only by host
+                       RAM. Device working set stays O(C).
+
+  device-visible tier  ~37 tok/s (stable, within 7.8% of H2O)
+                       device-bounded at ~82000-90000 spilled cells. Device
+                       working set becomes O(C + spill capacity).
+
+And the sharp consequence for the paper's capacity story: at its largest working
+capacity the device-visible configuration holds C=1024 resident plus 81920
+spilled, about 82900 tokens of context. A fused upstream build reaches roughly
+91000 tokens (A3, Phase A) with the whole context resident and no spill machinery
+at all. So in device-visible mode exact retention does not merely lose its
+capacity advantage over upstream -- it has slightly LESS reach than fused
+upstream, while still being the slower way to get there.
+
+The capacity argument therefore survives only in CPU-pinned mode, and the
+throughput argument survives only in device-visible mode. They cannot be claimed
+together, and which one is on the table is a configuration choice the paper has
+to make explicit.
+
+LIMITS
+-------
+- n=4 per arm, uncooled. Differences within rounds are drift-immune; levels are
+  not. The CPU-pinned arm's value in particular is thermally state-dependent by
+  30% and should not be quoted from this block.
+- Ceiling bracketed between 81920 and 90112 cells, not bisected. A finer walk
+  would place it to within a few thousand cells if the paper needs a single
+  number rather than an interval.
+- One C (1024). The ceiling is a function of total working set, so a larger
+  resident window moves it down by the corresponding amount; that follows from
+  the accounting but was not measured across C.
+- Device-visible mode is Metal/unified-memory specific and meaningless on
+  discrete memory, where the pin is doing real work.

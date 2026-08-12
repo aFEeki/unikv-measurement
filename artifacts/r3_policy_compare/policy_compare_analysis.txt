@@ -1,0 +1,134 @@
+*** SUPERSEDED AGAIN 2026-08-07 by B2 Block 2
+    (stress_results/b2_policy_block.csv, artifacts/b2_cooled/B2_analysis.txt),
+    which adds the device-visible arm and position-balances the CPU-pinned one.
+    Quote B2 for every throughput number at C=1024 and C=2048.
+    NB stress_results/r3_policy_compare_cooled_master.csv is still the
+    provenance source for figures/fig3_tokens (token COUNTS, unchanged in B2).
+    That figure is not used by the measurement paper. ***
+
+Cooled paired policy comparison — p0 / p1 / p3 at C in {1024, 2048}
+==================================================================
+Run 2026-08-03/04. Harness: scripts/run_policy_compare_cooled.py
+Data: stress_results/r3_policy_compare_cooled_master.csv (18 rows)
+Logs: artifacts/r3_policy_compare/logs/gen_<arm>_t<trial>.txt
+Addresses review items M1, M6, DA-3 (and supplies the Fig-3 policy-1 arm).
+
+*** SUPERSEDED 2026-08-05 by the 24-run, 8-arm block that adds the H2O
+comparator (artifacts/h2o_comparator/h2o_analysis.txt). The whole block was
+re-run rather than splicing H2O in, so all eight arms share one randomized
+order; r3_policy_compare_cooled_master.csv now holds those 24 rows. The two
+blocks agree to within 0.3 tok/s on the six shared arms (e.g. p3_c1024 28.90 ->
+29.05, p1_c1024 38.64 -> 38.52). Quote the 8-arm numbers. ***
+
+QUESTION
+--------
+Two things at once:
+ (a) M6 — the most-cited throughput numbers in the paper (42.5 / 33.0 / 28.5)
+     come from a single uncooled comparison run, on a device the paper itself
+     documents swinging 21% from heat. Do they survive the cooled
+     randomized-block protocol used for the alpha sweep?
+ (b) M1 / DA-3 — the paper compares UniKV only against policy 0, which errors
+     out at cache-full. Policy 1 (the rolling-window shift, the mechanism
+     upstream llama.cpp ships as --context-shift) also completes the budget and
+     is the comparator a practitioner would actually reach for. What does the
+     comparison look like when it is included?
+
+PROTOCOL
+--------
+512-token prompt + 2048-token decode budget; -fa off, -fit off, greedy
+(temp 0), seed 123, --ignore-eos, -b 512 -ub 512, UNIKV_ALPHA=0.
+6 arms x 3 trials = 18 runs, randomized block (shuffle seed 20260803), 200 s
+cooldown before every run — the same protocol as the cooled alpha sweep.
+
+Runs are UNINSTRUMENTED (no UNIKV_LOG). That matters: when UNIKV_LOG is set the
+library calls synchronize() at both ends of every decode call, so the per-step
+logging itself drains the pipeline every step. The superseded Run-1 numbers were
+instrumented; these are not, which also makes them directly comparable to the
+cooled alpha sweep's alpha=0 anchor (29.67 tok/s).
+
+Every row's flash_attn setting was parsed back out of that run's own log rather
+than trusted from the harness source: all 18 rows report flash_attn = disabled.
+All rc = 0. All arms under the 58 tok/s ceiling.
+
+RESULTS
+-------
+  arm         C     pol  tokens  device KV  spills  mean tok/s  sd     trials
+  p0_c1024    1024  0      512   128 MiB       0    42.59       0.02   3
+  p1_c1024    1024  1     2048   128 MiB       0    38.64       0.03   3
+  p3_c1024    1024  3     2048   128 MiB    1535    28.90       0.41   3
+  p0_c2048    2048  0     1536   256 MiB       0    40.74       0.02   3
+  p1_c2048    2048  1     2048   256 MiB       0    38.64       0.03   3
+  p3_c2048    2048  3     2048   256 MiB     511    34.98       0.13   3
+
+Token counts, spill counts and device-KV sizes are identical across all three
+trials of every arm (greedy + fixed seed): 1535 spills at C=1024 and 511 at
+C=2048 reproduce the published values exactly.
+
+Standard deviations are 0.02-0.41 tok/s (0.05-1.4%), against the ~21% thermal
+swing the uncooled block showed. Cooling works; these numbers are resolvable.
+
+WHAT CHANGED vs THE SUPERSEDED SINGLE RUN
+-----------------------------------------
+  arm        old (uncooled, instrumented)   new (cooled, uninstrumented)
+  p0_c1024   42.54                          42.59 +/- 0.02   (+0.1%)
+  p3_c1024   28.45                          28.90 +/- 0.41   (+1.6%)
+  p0_c2048   40.22                          40.74 +/- 0.02   (+1.3%)
+  p3_c2048   33.03                          34.98 +/- 0.13   (+5.9%)
+
+The baselines barely moved; the two policy-3 arms moved up, p3@2048 by 5.9%.
+Both the thermal protocol AND the instrumentation changed between the two, so
+this is not a clean measurement of the cooling effect alone — the honest
+statement is that the cooled uninstrumented numbers supersede the old ones, not
+that heat accounted for the difference.
+
+THE COMPARATOR PROBLEM (M1 / DA-3), MEASURED
+--------------------------------------------
+At C=1024, against the error-out baseline:  2048 vs 512 tokens = the "4x".
+At C=1024, against the rolling-window shift: 2048 vs 2048 tokens = 1x.
+
+So the token-count advantage is entirely an advantage over a configuration that
+refuses to continue, not over the continuation policy the same codebase ships.
+The difference against policy 1 is not how much is generated but what: policy 1
+completes the budget by discarding, policy 3 by retaining (see the unified
+quality harness for the retrieval consequence).
+
+The throughput price of losslessness, measured at fixed C and fixed token count:
+  C=1024:  38.64 -> 28.90 tok/s  = 25.2% slower than the lossy comparator
+  C=2048:  38.64 -> 34.98 tok/s  =  9.5% slower
+
+A NUMBER THE PAPER SHOULD STOP USING THIS WAY
+---------------------------------------------
+"42.5 -> 28.5 is pure recall cost" does not survive this block. 42.5 is the
+policy-0 arm, and that arm HALTS after 512 decode tokens: its rate is measured
+over a short decode phase whose KV occupancy only ever reaches C, and it never
+pays for continuing past cache-full at all. Comparing it to a 2048-token
+policy-3 run charges the recall mechanism for the cost of continuing to exist.
+(PROJECT_STATE already retires the baseline as a rate comparator for exactly
+this reason under DEAD NUMBERS; the 42.5 -> 28.5 framing reintroduced it.)
+
+The like-for-like recall cost — same C, same device KV, same token count, same
+flash-attention setting, same block — is 38.64 -> 28.90 at C=1024 (25.2%) and
+38.64 -> 34.98 at C=2048 (9.5%), i.e. it scales with the spilled set (1535 vs
+511 cells), which is the claim the cost model actually needs.
+
+SIDE OBSERVATION (physically sensible, worth one line in the paper)
+-------------------------------------------------------------------
+p1_c1024 and p1_c2048 are identical to three digits (38.64 +/- 0.03 both), and
+p0 differs only 42.59 vs 40.74 across a 2x context change. Decode is dominated
+by streaming the ~4.6 GiB of Q4_K_M weights per token; the KV read is 128-256
+MiB, a few percent of that. Context size is a second-order term for the
+GPU-resident policies — which is precisely why the CPU-pinned spilled tier
+(a per-step cost that is NOT weight-bandwidth-bound) shows up so clearly.
+
+LIMITS
+------
+- n=3 per arm. SDs are small but these are three trials on one machine on one
+  night, not a distributional claim.
+- Uninstrumented, so no per-step shift counts for policy 1 in this block; the
+  spill counts quoted for policy 3 come from its stderr INFO lines. A separate
+  instrumented pass (UNIKV_PC_STEPLOG=1) is needed if per-call shift counts for
+  policy 1 are wanted for the paper.
+- One p3_c1024 trial (order 17, 29.38) sits ~0.7 tok/s above the other two
+  (28.64, 28.69) and is what makes that arm's sd 0.41 rather than ~0.03. It is
+  the last p3_c1024 in the block and the fastest, so it is not a heat-soak
+  artifact; unexplained, and left in rather than trimmed.

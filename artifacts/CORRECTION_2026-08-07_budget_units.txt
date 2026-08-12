@@ -1,0 +1,97 @@
+CORRECTION — MB vs MiB in every "x budget" ratio
+================================================
+Found 2026-08-07 while building the optional capacity figure. Affects ratios
+only. No measured quantity changes and no conclusion changes.
+
+WHAT WAS WRONG
+--------------
+ggml prints the Metal budget in DECIMAL megabytes:
+
+    ggml_metal_device_init: recommendedMaxWorkingSetSize  = 17179.89 MB
+
+Every footprint we record -- KV buffer, compute buffer, model buffer, the
+memory_breakdown row -- is in MiB. 17179.89 MB is 16384.0 MiB exactly
+(17179.89e6 / 2^20). Several harnesses divided a MiB total by 17179.89 as if it
+were MiB, so those ratios came out 4.9% too low.
+
+Affected code (now fixed, all convert MB -> MiB before dividing):
+    scripts/run_capacity_probe.py      -> capacity_probe.csv
+    scripts/run_capacity_workload.py   -> capacity_workload.csv
+    scripts/run_capacity_demo.py       -> capacity_demo.csv
+    scripts/run_f4_phaseA.py           -> f4_a1_ubatch_sweep.csv,
+                                          f4_a3_flash_attn_capacity.csv,
+                                          f4_a2_continuation_arms.csv
+
+The `x_budget` / `device_over_budget` COLUMNS in those already-written CSVs are
+stale. The MiB columns beside them are correct. Do not quote the ratio columns;
+recompute as device_total_mib / 16384.
+
+Some ratios in the prose were computed by hand against 16383 MiB and are
+therefore already right, which is why the affected numbers are scattered rather
+than uniform. Each is listed below.
+
+CORRECTIONS
+-----------
+Finding 4 capacity table (in paper/UNIKV-MEASUREMENT/main.tex):
+
+    C          device MiB   printed   correct
+    32768         10913       0.64      0.67   <-- FIX
+    49152         14017       0.86      0.86       ok
+    65536         17121       1.05      1.05       ok
+    81920         20225       1.23      1.23       ok
+   131072         29537       1.72      1.80   <-- FIX
+
+Phase A and the capacity demonstration (analysis files, now corrected in place):
+
+    quantity                       device MiB   reported   correct
+    A3  fa-on,  C=73728               14159.8      0.824     0.864
+    A2  fa-off, ubatch 64, C=81920    15587.8      0.907     0.951
+    demo stock C=49152                14017.3      0.816     0.856
+    demo stock C=73728                18673.3      1.087     1.140
+    demo UniKV C=4096                  5481.3      0.319     0.335
+
+Predicted per-ubatch ceilings (from the corrected budget, A1 sweep):
+
+    ubatch   KiB/token   predicted C at the wall   measured bracket
+        64       136.2                     87922   (81920, 98304]
+       128       144.5                     82903   (81920, 98304]
+       256       161.0                     74406   (65536, 81920]
+       512       194.0                     61749   (49152, 65536]
+
+Every prediction still falls inside its measured bracket, and the agreement is
+TIGHTER with the correct budget than it was with the wrong one.
+
+WHAT DOES NOT CHANGE
+--------------------
+- Every MiB figure: KV, scratch, model, device totals, host store, free memory.
+- Every KiB/token figure, including the 193 KiB/token headline and its ubatch
+  dependence (136-194): these are slopes of MiB against C and never touched the
+  budget.
+- Every outcome: which configurations complete and which are refused.
+- The B1 device-visible ceiling (81920-90112 cells) and its headroom arithmetic,
+  which was done against 16383 MiB and is correct.
+- All of Findings 1, 2, 3 and 5, which involve no memory ratio.
+
+A NEAR MISS WORTH RECORDING
+----------------------------
+The bug first surfaced as a provenance assertion firing in the new capacity
+figure: a run had been REFUSED at what appeared to be 0.997x the budget, below
+the wall. The obvious reading was that the wall sits slightly below the advisory
+value, and the figure was briefly rewritten to show the wall as a measured band
+rather than a line -- a plausible-looking refinement to Finding 4 that was
+entirely an artefact of the unit error. It survived about ten minutes, because
+the "refinement" was strange enough to be worth checking rather than shipping.
+
+With the correct budget the original claim is not merely restored but sharpened:
+every completion sits below 16384 MiB and every refusal above it, with the
+largest completion at 0.992x and the smallest refusal at 1.045x. The wall IS the
+advisory budget.
+
+Two lessons for the paper's own methodology section, which is about measurement
+pitfalls and where this would sit honestly:
+  1. A tool that prints MB and a tool that prints MiB will differ by 4.9%, which
+     is small enough to look like a real effect and large enough to move a
+     threshold.
+  2. The assertion that caught it was checking a claim about the DATA, not about
+     the code. An assertion that had only verified "the CSV parses" would have
+     drawn the wrong figure silently.

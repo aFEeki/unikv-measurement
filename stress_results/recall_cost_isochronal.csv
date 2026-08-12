@@ -1,0 +1,4 @@
+order_idx,target,trial,prompt_tokens,rc,burst_steps,transient_ms,n_spill_mean,n_spill_min,n_spill_max,ms_mean,ms_median,ms_sd,tok_per_sec,flash_attn,prefill_ms,prefill_tokens,duration_s,t_start_iso
+1,512,1,1536,0,96,1469.3,591.5,544,639,27.244,27.239,0.19,36.705,disabled,3965.92,1536,8.1,2026-08-06T18:03:26
+2,8192,1,9216,0,96,3335.7,8271.5,8224,8319,44.766,44.924,0.674,22.338,disabled,40737.4,9216,47.0,2026-08-06T18:03:34
+3,0,1,512,0,96,1250.4,0,0,0,23.806,23.771,0.302,42.006,disabled,1250.44,512,5.1,2026-08-06T18:04:21

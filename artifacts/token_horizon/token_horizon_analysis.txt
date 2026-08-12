@@ -1,0 +1,179 @@
+Token-identity horizon — 512 tokens, two prompts, first-divergence indices
+================================================================================
+Run 2026-08-11. Harness: scripts/run_token_horizon.py
+Data:  quality_results/token_horizon.csv
+Traces: artifacts/token_horizon/sequences/*.txt (full 512-token id sequences)
+Logs:  artifacts/token_horizon/logs/, prompts in artifacts/token_horizon/prompts/
+Console: artifacts/token_horizon/run.log       Exit status 0 — no flags raised.
+
+WHY THIS RUN EXISTS
+-------------------
+The paper's only positive recommendation — that exact retention buys reproducible
+decode — rested on 32 generated tokens on one prompt. Thirty-two tokens is short
+enough that an evicting policy could plausibly agree by luck, and one prompt is
+repetitive filler, which may be unusually easy to reproduce. This block extends
+the horizon 16x and adds a structurally different prompt, and reports the token
+INDEX at which each arm first diverges rather than only whether it does.
+
+DESIGN
+------
+One block, one batch tiling, no splicing. Every arm: -b 256 -ub 256, -fa off,
+greedy (--temp 0), --seed 123, --ignore-eos, 512 generated tokens, prompt
+3834 tokens. flash_attn was parsed back from each run's own stderr as "disabled"
+on all ten runs, and n_batch/n_ubatch parsed back as 256/256 on all ten; the
+harness flags and fails if either disagrees. It did not.
+
+  arm             C      policy  role
+  ref_c8192       8192   0       no-eviction reference
+  p3_cpu_c1024    1024   3       exact retention, CPU-pinned spill tier
+  p3_dev_c1024    1024   3       exact retention, device-visible spill tier
+  p4_h2o_c1024    1024   4       H2O fixed-budget eviction
+  ctl_ref_c4096   4096   0       CONTROL (see DEVIATION)
+
+Two prompts, matched to exactly 3834 tokens so the arms see identical cache
+pressure and differ only in structure:
+  passkey  the published probe — repetitive filler with a planted key. Low
+           entropy; the easy case.
+  prose    a 10789-character prefix of llama.cpp/README.md, binary-searched on
+           character count to hit 3834 tokens exactly. Natural technical English
+           with markdown, lists, links and code spans. The hard case.
+
+The run did NOT stop at first divergence. Every arm generated the full budget and
+the complete id sequence is written out, because the trace after the divergence
+turned out to carry most of the information (see FINDING 3).
+
+DEVIATION FROM THE BRIEF, AND THE CONTROL THAT COVERS IT
+---------------------------------------------------------
+The brief specified the reference at C=4096. That was right at the old 32-token
+horizon (3834 + 32 = 3866 fits) but is impossible at this one: 3834 + 512 = 4346
+cells > 4096, so a C=4096 policy-0 arm evicts and cannot be a no-eviction
+reference. The reference is therefore C=8192, which holds the whole run.
+
+ctl_ref_c4096 exists so that substitution is evidenced rather than asserted. It
+is the reference at the originally specified C, and it ran until the cache filled
+— at exactly 262 generated tokens (3834 + 262 = 4096), which is the arithmetic
+confirming it filled rather than stopped for some other reason. Over those 262
+tokens it must match the C=8192 reference if the reference is C-invariant.
+
+  CONTROL passkey : C=4096 vs C=8192 over 262 tokens -> AGREE (identical)
+  CONTROL prose   : C=4096 vs C=8192 over 262 tokens -> AGREE (identical)
+
+The reference does not depend on the cache size, so the substitution is free. Had
+it disagreed, that would have been the headline and every identity claim in the
+paper would have needed re-examining.
+
+THE RESULT
+----------
+                                     first divergence from the reference
+  arm                   role                passkey        prose
+  p3_cpu_c1024   exact, CPU tier      none in 512     none in 512
+  p3_dev_c1024   exact, device tier   none in 512     none in 512
+  p4_h2o_c1024   H2O eviction         token 16        token 0
+  ctl_ref_c4096  CONTROL              none in 262     none in 262
+
+Identity is whole-sequence, not merely prefix agreement: the reference and both
+exact-retention arms share one md5 over all 512 sampled ids per prompt
+(passkey 5ffd523326, prose 193a7fb427), so this is 512/512 on both prompts for
+both spill tiers.
+
+FINDING 1: EXACT RETENTION IS BIT-IDENTICAL AT 16x THE PUBLISHED HORIZON
+-------------------------------------------------------------------------
+Both retention arms reproduce the no-eviction reference exactly for all 512
+tokens on both prompts, including on the high-entropy prose prompt where the
+model is generating URLs, markdown structure and repository names rather than
+recycling filler. The device-visible tier matches the CPU-pinned tier exactly,
+so the placement of the spilled tier does not perturb the arithmetic — which is
+the property the B1/B2 throughput trade needs in order to be a free choice.
+
+This is not a vacuous comparison: both retention arms genuinely spilled. Their
+logs end at "spilled 1 cells (0.12 MiB) to host; retained=3321" — 3321 cells in
+the host tier against 1024 resident, i.e. 76% of the working set was off-device
+by the end of the run. The reference logs contain zero spill or eviction lines.
+So the identical arms are doing 3321 spill-and-recall round trips and still
+landing on the same 512 tokens.
+
+FINDING 2: H2O DIVERGES EARLY, AND EARLIER ON THE HARDER PROMPT
+-----------------------------------------------------------------
+H2O at the same budget diverges at token 16 on the passkey probe and at token 0
+on prose — under identical pressure, 3321 cells evicted, matching the retention
+arms' 3321 spilled. The recommendation the paper makes is therefore demonstrated
+rather than assumed: at a fixed 1024-cell budget, retention reproduces the
+reference and eviction does not.
+
+The ordering across prompts is the expected one. The repetitive prompt gives H2O
+sixteen tokens of grace because the discarded context is largely redundant with
+what remains; the prose prompt gives it none, because the first generated token
+completes a URL that was truncated mid-word and the evidence for it was evicted.
+
+FINDING 3: THE FULL TRACE, WHICH IS WHY THE RUN DID NOT STOP AT DIVERGENCE
+----------------------------------------------------------------------------
+First-divergence index alone would have made the two prompts look like the same
+result at different offsets. They are not. Agreement with the reference, in
+128-token windows:
+
+  window       passkey     prose
+  0-127         14.1%      64.1%
+  128-255        3.1%      37.5%
+  256-383        3.1%      21.9%
+  384-511        3.1%       7.8%
+  overall     30/512=5.9%  168/512=32.8%
+
+On the passkey probe H2O diverges once and never recovers: it falls into a
+repetition loop ("It is not a clue or a hint. It is a repetition of the same
+information." repeated) and sits at 3.1% agreement — floor-level coincidence —
+for the remaining 384 tokens.
+
+On prose it decoheres gradually instead. It diverges at token 0, re-synchronises
+for tokens 2-11, and then drifts monotonically window by window: 64% -> 38% ->
+22% -> 8%. Both arms are generating the same KIND of thing (a markdown list of
+language bindings), so they keep colliding on boilerplate tokens while the list
+contents drift apart. That is a qualitatively different failure from the passkey
+loop, and it is only visible because the run continued past the first mismatch.
+
+FINDING 4: H2O IS NOT A STRAWMAN — IT STILL SOLVES THE RETRIEVAL TASK
+----------------------------------------------------------------------
+Worth stating plainly, because Table 3's passkey result invites the suspicion
+that the evicting baseline is dumb by construction. It is not. H2O recovers the
+planted key (48291) and opens with "48291. Remember it. 48291 is the pass key."
+passkey_found is True for every arm that ran the passkey prompt, H2O included.
+
+The claim this block supports is therefore narrow and should be stated narrowly:
+exact retention reproduces the reference token stream and H2O does not. It is
+NOT a claim that H2O fails the passkey task, because it doesn't.
+
+A NOTE ON WHAT "IDENTICAL" IS MEASURED AGAINST
+------------------------------------------------
+Identity here is arm-vs-reference, not arm-vs-ground-truth. The prose prompt was
+cut mid-token at ".../offline-ai/c"; the README actually continues "li](...cli)".
+The reference completes it as "pae](.../cpae)" and H2O as "atalyst](.../catalyst)"
+— both wrong about the source document. That is irrelevant to this experiment and
+should not be presented as though the reference were correct: the reference
+defines the target sequence, and the question is only which policies reproduce it.
+
+THROUGHPUT — RECORDED, NOT QUOTABLE
+------------------------------------
+The CSV carries tok/s because the runs produced it, and it must not be quoted:
+this block has no cooldowns and one trial per cell, because token identity under
+greedy decoding with a fixed seed is deterministic and thermally invariant. The
+values (passkey / prose) were ref 33.4/33.1, p3_cpu 22.0/20.2, p3_dev 30.7/30.6,
+h2o 41.6/40.9. The ordering agrees with the cooled B2 block, which is mild
+reassurance that nothing was misconfigured, but the cooled block is the source
+for every rate the paper states.
+
+LIMITS
+------
+- One model, one machine, one quantization, one budget (C=1024), 512 tokens. The
+  claim is "identical to 512 tokens", not "identical forever". Exact retention is
+  exact by construction — the spilled K/V are recalled, not approximated — so
+  there is no mechanism here that would break at 513; but the measurement stops
+  where it stops and the paper should say 512.
+- Two prompts is two. They differ in entropy and structure, which is the axis the
+  review named, but they do not cover e.g. code, non-English, or multi-turn.
+- H2O is our implementation (policy 4) with the two deviations documented in
+  llama-unikv-h2o.h: scores aggregated over heads and layers because a llama.cpp
+  cell is shared across heads, and a running sum rather than an average. A
+  different H2O implementation could diverge at a different index. It could not
+  plausibly be identical, since it discards state the reference used.
+- The passkey and prose divergence indices (16 and 0) are single observations,
+  not distributions. "Diverges within the first 16 tokens on both prompts" is
+  what the data supports; the exact index is not a stable quantity.

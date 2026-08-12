@@ -1,0 +1,5 @@
+arm,policy,ctx,sink,prompt_tokens,passkey_end_pos,gen_tokens,passkey,passkey_found,shift_events,first_shift_step,distinct_word_ratio,rc,output_verbatim
+UniKV_retention,2,4096,0,3834,219,32,48291,1,0,,0.818,0,"48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is"
+StreamingLLM_k4,1,1024,4,3834,219,32,48291,0,1,3,0.321,0,the password. The password is the key to the pass. The pass key is the key to the pass. The pass key is the key to the pass.
+naive_rolling,1,1024,0,3834,219,32,48291,0,1,3,0.125,0,the pass key is the pass key is the pass key is the pass key is the pass key is the pass key is the pass key is the pass key is
+control_p1_bigC,1,4096,0,3834,219,32,48291,1,0,,0.818,0,"48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is"

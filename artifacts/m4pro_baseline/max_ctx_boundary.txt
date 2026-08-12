@@ -1,0 +1,23 @@
+Maximum stable context boundary notes for Apple M4 Pro Metal baseline
+
+Stable context:
+- 196608 tokens
+  Source log: artifacts/m4pro_baseline/logs/probe_ctx_196608.log
+  Command:
+  build-m4pro-metal/bin/llama-completion -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf -f artifacts/m4pro_baseline/prompts/probe_prompt_ctx_196608.txt -n 1 -c 196608 -ngl 999 -t 10 -tb 10 -b 2048 -ub 512 -fa on -fit off --temp 0 --seed 123 --ignore-eos --no-warmup --perf --simple-io --no-display-prompt -no-cnv
+
+First failing context:
+- 197632 tokens
+  Command:
+  build-m4pro-metal/bin/llama-completion -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf -p ' token' -n 1 -c 197632 -ngl 999 -t 10 -tb 10 -b 2048 -ub 512 -fa on -fit off --temp 0 --seed 123 --ignore-eos --no-warmup --perf --simple-io --no-display-prompt -no-cnv
+  Result:
+  ggml_metal_synchronize: error: command buffer 0 failed with status 5
+  error: Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)
+
+Additional failing probes used during bisection:
+- 198656
+- 200704
+- 204800
+- 212992
+- 229376
+- 262144

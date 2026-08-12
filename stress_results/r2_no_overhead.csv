@@ -1,0 +1,3 @@
+tag,ctx,policy,rc,decode_tokens,tok_per_sec,spill_events,retained,kv_device_mib,ceiling_flag
+r3_p0_c4096,4096,0,0,2048,38.703,0,0,512.0,False
+r3_p3_c4096,4096,3,0,2048,36.946,0,0,512.0,False

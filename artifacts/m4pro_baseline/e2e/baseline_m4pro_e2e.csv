@@ -1,0 +1,5 @@
+context_length_tokens,prompt_tokens,decode_tokens,e2e_tok_per_sec,eval_time_tok_per_sec_xcheck,duration_s,e2e_csv,log
+4096,3840,256,40.396,40.428,16.93,artifacts/m4pro_baseline/e2e/baseline_ctx_4096_e2e.csv,artifacts/m4pro_baseline/logs/e2e_baseline_ctx_4096.log
+8192,7936,256,36.501,36.501,30.13,artifacts/m4pro_baseline/e2e/baseline_ctx_8192_e2e.csv,artifacts/m4pro_baseline/logs/e2e_baseline_ctx_8192.log
+16384,16128,256,29.884,29.857,61.71,artifacts/m4pro_baseline/e2e/baseline_ctx_16384_e2e.csv,artifacts/m4pro_baseline/logs/e2e_baseline_ctx_16384.log
+32768,32512,256,20.721,20.677,154.38,artifacts/m4pro_baseline/e2e/baseline_ctx_32768_e2e.csv,artifacts/m4pro_baseline/logs/e2e_baseline_ctx_32768.log

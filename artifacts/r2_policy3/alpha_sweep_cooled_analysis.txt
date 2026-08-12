@@ -1,0 +1,46 @@
+Policy-3 recall-cost alpha sweep — COOLED (R2 final), 21 runs (7 alpha x 3
+trials), C=1024, 512-prompt + 2048 decode, -fa off, randomized-block seed
+20260710, 200 s cooldown before every run.
+Data: alpha_results/p3_alpha_sweep_cooled_master.csv, p3_alpha_timing_cooled_log.csv.
+
+This SUPERSEDES the flat 35-run sweep (that one was thermally masked; kept as
+evidence in p3_alpha_sweep_master.csv). Cooldowns hold thermal steady, so the
+real trend resolves.
+
+RESULT — clean, strictly monotone, tight bars:
+  alpha  tok/s   std     decode_ms
+  0      29.67   0.09    69019    <- unified-memory anchor (no per-step sync)
+  0.25   29.19   0.20    70167
+  0.5    28.67   0.12    71439
+  0.75   28.50   0.07    71848
+  1      28.25   0.03    72496    <- A100 PCIe 4.0 x16 equivalent
+  1.5    27.59   0.03    74236
+  2      27.01   0.06    75814
+All 21 runs lossless (2048 tokens), all < 58 tok/s ceiling.
+
+QUALITY OF THE RESULT:
+- Strictly monotone decreasing in alpha.
+- Span alpha 0->2 = 2.66 tok/s = 9.0% (vs old policy-1 sweep 6.3%, which was
+  only "directional" with overlapping error bars).
+- Error bars ~0.03-0.20 tok/s while adjacent-alpha steps are ~0.5 tok/s, so every
+  adjacent pair is RESOLVABLE. This is a precision result, not merely directional
+  -- stronger than the numbers it supersedes.
+
+STRUCTURE (for framing / Fig 4):
+- Linear fit on the alpha>0 points: decode_ms = 69549 + 3118*alpha (ms).
+- Measured alpha=0 = 69019 ms sits 530 ms BELOW that extrapolated intercept.
+  That 530 ms is the physical non-blocking->blocking transition: alpha=0 has no
+  per-step synchronize() (natural GPU/CPU overlap); alpha>0 drains each spilling
+  step. Small and clean -- correct earlier over-estimate (the A/B verify implied
+  ~2.2 s only because it assumed the idealized 2417 ms/alpha slope; with 6 alpha>0
+  points the measured slope is 3118 ms/alpha and the true offset is 530 ms).
+- Idealized transfer term (analytic, sum(n_spilled)*per_cell/64GB/s) = 2417
+  ms/alpha; measured slope 3118 ms/alpha. The ~29% excess is per-step overhead
+  (synchronize drain + nanosleep granularity over ~1536 spilling steps), i.e. real
+  blocking-recall cost beyond the idealized byte transfer. Fig 4 can show measured
+  wall-clock (3118) or the idealized transfer term (2417) -- both recoverable.
+
+READ FOR THE PAPER: alpha=0 (unified memory) is the fast anchor; as alpha rises
+toward the A100 PCIe point (alpha=1) and beyond, throughput falls smoothly and
+resolvably. "From PCIe to Zero" made visible: the transfer term vanishes at
+alpha=0 and grows monotonically with modeled transfer cost.

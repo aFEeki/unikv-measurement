@@ -1,0 +1,193 @@
+Is the drain cost alpha-independent? No. The 71/29 split does not survive.
+================================================================================
+Run 2026-08-11. Harness: scripts/run_drain_alpha1.py
+Data:  alpha_results/p3_drain_alpha1_master.csv (12 runs)
+Logs:  artifacts/drain_alpha1/logs/, console artifacts/drain_alpha1/run.log
+Supersedes the DECOMPOSITION section of
+artifacts/drain_control/drain_control_analysis.txt. Does NOT affect fig7, whose
+plotted values and within-block gap are unchanged.
+
+QUESTION
+--------
+The published decomposition splits the alpha=0 -> alpha=0.25 step into 29% drain
+and 71% modeled transfer. That split assumes the pipeline-drain cost is the same
+at every alpha. The first drain-control block never tested it: it measured drain
+cost only at alpha=0 and its one alpha=1 point was undrained. This block closes
+the 2x2.
+
+DESIGN
+------
+Four cells, 3 trials each, one block, randomized (seed 20260811), 200 s cooldown
+before every run including the first, uninstrumented (UNIKV_LOG unset — it
+synchronizes at both ends of every decode call and would drain the arms whose
+whole point is that they do not). Otherwise identical to the first block: policy
+3, C=1024, 512-token prompt, 2048 decoded tokens, -fa off, greedy, seed 123.
+All 12 runs: rc=0, flash_attn parsed back as "disabled", 2048 tokens decoded.
+
+All four cells are in THIS block. The one missing arm could have been run alone
+and differenced against the first block's a1_nodrain, but that is exactly the
+cross-block contrast the fig7 provenance note rejected. Both differences below
+are within-block; re-measuring the alpha=0 pair also buys an independent
+replication of the published drain cost, which turns out to matter (Finding 2).
+
+RESULTS
+-------
+  condition    alpha  drains  n   mean tok/s    sd
+  a0_nodrain    0.00   no     3      29.642   0.067
+  a0_drain      0.00   yes    3      29.720   0.165
+  a1_nodrain    1.00   no     3      29.069   0.428
+  a1_drain      1.00   yes    3      28.088   0.018
+
+  drain cost (undrained - drained) at alpha=0 :  -0.078 +/- 0.103   t = -0.76
+  drain cost (undrained - drained) at alpha=1 :  +0.981 +/- 0.247   t = +3.97
+  interaction (difference of the two)         :  +1.059 +/- 0.268   t = +3.96
+
+  VERDICT: the drain cost is alpha-DEPENDENT. The decomposition is not validated.
+
+FINDING 1: THERE IS NO FIXED DRAIN COST — THE DRAIN COSTS WHAT IT EXPOSES
+---------------------------------------------------------------------------
+At alpha=0 the drain is free: -0.078 +/- 0.103 tok/s, indistinguishable from
+zero and if anything the wrong sign. At alpha=1 the same drain costs
++0.981 +/- 0.247 tok/s. The interaction is as large as either main effect
+(main effect of alpha -1.103, of drain -0.452, interaction 1.059).
+
+That is the physically expected result and it is worth stating as a mechanism
+rather than a coefficient. synchronize() has no intrinsic price on this path;
+what it does is prevent the injected CPU sleep from overlapping in-flight Metal
+work. With no sleep to expose (alpha=0) it exposes nothing. With a ~3.1 ms sleep
+against a ~34 ms step (alpha=1) it exposes nearly all of it. The drain and the
+modeled transfer are not two costs that add; they are one mechanism observed
+through a switch.
+
+FINDING 2: THE PUBLISHED alpha=0 DRAIN COST DOES NOT REPLICATE
+----------------------------------------------------------------
+  block 1 (2026-08-03):  +0.197 +/- 0.177  t = +1.11
+  block 2 (this block):  -0.078 +/- 0.103  t = -0.76
+
+The published +0.20 tok/s was never statistically distinguishable from zero in
+its own block (t = 1.11), and this block gets the opposite sign. The blocks agree
+on levels to 0.4-0.5% on all three shared conditions (a0_nodrain 29.642 vs
+29.762, a0_drain 29.720 vs 29.566, a1_nodrain 29.069 vs 29.221), so this is not
+a calibration difference between blocks — the alpha=0 drain cost is simply
+smaller than the block-to-block variation. Pooling both blocks, the best estimate
+of the drain cost at alpha=0 is zero.
+
+The "29%" therefore has no measured referent.
+
+FINDING 3: THE ADDITIVITY ARGUMENT IN THE FIRST BLOCK WAS A TELESCOPING SUM
+-----------------------------------------------------------------------------
+This is the part that needs correcting rather than merely extending, and the
+first block's own data was already sufficient to show it.
+
+drain_control_analysis.txt argues the effects "ARE additive once the drain is
+held constant" because 0.20 + 0.50 = 0.70 against 0.69 measured together. That
+sum is a tautology. Walking any path across a 2x2 from one corner to the
+opposite corner sums to the corner-to-corner difference by construction. Using
+the same four block-1 cell means:
+
+  corners: (a=0,nodrain) 29.762   (a=0,drain) 29.566
+           (a=.25,nodrain) 29.781 (a=.25,drain) 29.068
+
+  published path, drain first  : drain +0.197, then transfer +0.498  sum +0.694
+  other path, transfer first   : transfer -0.019, then drain +0.713  sum +0.694
+
+Both sum to +0.694. Additivity requires the two paths to agree on each TERM, and
+they do not: the drain costs +0.197 at alpha=0 and +0.713 at alpha=0.25, and the
+transfer costs -0.019 undrained and +0.498 drained. The within-block interaction
+in block 1 alone is +0.516 +/- 0.190, t = +2.72 — significant, present in the
+published data, and not computed at the time. This block confirms it
+independently at a wider alpha spacing (+1.059, t = +3.96).
+
+Two independent blocks, two different alpha ranges, same conclusion.
+
+DRAIN COST AS A FUNCTION OF ALPHA — EVERY POINT WITHIN ITS OWN BLOCK
+---------------------------------------------------------------------
+  alpha    drain cost (undrained - drained)      block
+  0.00     +0.197 +/- 0.177   (t =  1.11, n.s.)  1
+  0.00     -0.078 +/- 0.103   (t = -0.76, n.s.)  2
+  0.25     +0.713 +/- 0.068   (t = 10.46)        1
+  1.00     +0.981 +/- 0.247   (t =  3.97)        2
+
+Monotone and consistent across blocks: zero when there is no delay to expose,
+clearly positive once there is. The two blocks are listed separately and must not
+be fitted jointly — that would be the splice fig7 declined.
+
+THE POSITION CONFOUND, AND WHY IT DOES NOT EXPLAIN THE RESULT
+---------------------------------------------------------------
+Reported because it is a real defect in this block's design. The shuffle drew a
+bad layout: alpha=1 conditions landed early and alpha=0 late (mean slots 3.00,
+5.00, 7.33, 10.67 for a1_nodrain, a1_drain, a0_drain, a0_nodrain). Condition is
+confounded with block position, and worse, the two drain contrasts run in
+OPPOSITE directions with respect to position — so a monotone thermal drift would
+bias them oppositely and could manufacture exactly this interaction. This is the
+failure the B2 brief warned about: randomization alone does not guarantee
+position balance, and this harness relied on it alone. A future block should
+position-balance explicitly.
+
+Three checks say the draw was harmless here:
+
+1. THERE IS NO DRIFT. Removing condition means and regressing the residuals on
+   slot gives +0.0009 tok/s per slot (se 0.0165, t = 0.05) — +0.009 tok/s across
+   the entire block. The 200 s cooldowns did their job. The drift-implied bias in
+   the interaction is -0.005 tok/s against a measured 1.059.
+2. STRICTLY LOCAL CONTRASTS, immune to any monotone drift, give the same answer.
+   At alpha=1, a1_nodrain sits in slot 6 between a1_drain in slots 5 and 7:
+   29.016 - 28.096 = +0.919. At alpha=0, the adjacent pairs 8/9 and 10/11 give
+   +0.010 and -0.226, mean -0.108. Local interaction: +1.027.
+3. DETRENDED cell means give +1.064.
+
+Full-block +1.059, local +1.027, detrended +1.064. The finding is not an artifact
+of the layout.
+
+One honest caveat on precision: a1_nodrain is much noisier than the other three
+cells (sd 0.428 against 0.067, 0.165, 0.018) and its standard error dominates the
+interaction's. Dropping its two earliest runs and using only its coolest slot
+gives an alpha=1 drain cost of +0.928 instead of +0.981, so the noise affects the
+third digit, not the conclusion. Why that one cell is noisy is not established
+here — it is the cell where a large injected sleep is left to overlap, so partial
+absorption may genuinely vary run to run.
+
+WHAT THE PAPER SHOULD SAY
+--------------------------
+The 71/29 split should be withdrawn, not restated with a different pair of
+numbers, because there is no alpha at which it is a decomposition into two
+separable costs. The replacement claim is stronger and simpler, and it is what
+both blocks actually show:
+
+  The pipeline drain has no measurable cost of its own (alpha=0: t = 1.11 and
+  t = -0.76 in two independent blocks). Its cost is the injected delay it stops
+  the pipeline from absorbing, and it therefore grows with alpha: +0.71 tok/s at
+  alpha=0.25 and +0.98 at alpha=1. Drain and modeled transfer are one mechanism
+  seen through a switch, not two additive terms.
+
+This does NOT rescue the alpha=0 offset from the reviewer's objection, and the
+paper should not present it as if it did. Comparing like with like at drain OFF,
+the alpha=0 -> alpha=0.25 step is +0.019 +/- 0.174 — nothing. The whole step
+exists only in the drained comparison, which is the comparison whose
+instrumentation changes at the treatment boundary. The measured content of the
+alpha model at alpha=0.25 is: an injected delay that a drained pipeline pays in
+full and an undrained one does not pay at all.
+
+WHAT IS UNAFFECTED
+------------------
+- fig7 and artifacts/drain_control/fig7_provenance.txt. Every value fig7 plots is
+  a cell mean from block 1, and its headline is the within-block alpha=0.25 gap
+  (+0.713 +/- 0.068, t = 10.5), which stands. The figure draws two series with
+  different slopes; the interaction reported here is that difference in slopes,
+  so the figure is if anything a more direct picture of the corrected claim than
+  of the one it was drawn for. No regeneration needed.
+- The recall-cost fit, the capacity findings, and the token-identity result.
+- The alpha sweep's drained slope (-1.197 +/- 0.052), which was always measured
+  with the drain on throughout and is internally consistent.
+
+LIMITS
+------
+- One machine, one model, C=1024, 512-token prompt, 2048 decoded tokens. Drain
+  cost is a function of how much asynchronous work is in flight, which is
+  workload-specific.
+- Two alpha values in this block. "Grows with alpha" is supported by four points
+  across two blocks; the SHAPE of that growth is not measured and should not be
+  fitted.
+- The alpha=0 conclusion is a failure to reject, from n=3 in each of two blocks.
+  It bounds the drain cost at roughly +/-0.2 tok/s (0.7% of throughput), not to
+  exactly zero.

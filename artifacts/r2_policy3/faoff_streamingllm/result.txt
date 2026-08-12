@@ -1,0 +1,18 @@
+StreamingLLM k=4 arm re-run FA-OFF (Table II FA-consistency; the one arm that
+was FA-on). policy-1, C=1024, sink=4, seed 123, temp 0, greedy, prompt=3834 tok
+(contrast_prompt.txt, passkey 48291 at ~pos 219). Only change vs original: -fa off.
+
+FA setting (from log)  : flash_attn = disabled  (CONFIRMED OFF)
+passkey 48291          : LOST         (FA-on baseline: LOST)   -> unchanged
+distinct_word_ratio    : 0.321        (FA-on baseline: 0.321)  -> identical
+coherence              : grammatical (repetitive info-loss, sink preserved)
+tok/s                  : 36.95        (< 58 OK)
+output text            : byte-identical to the FA-on run:
+  "the password. The password is the key to the pass. The pass key is the key
+   to the pass. The pass key is the key to the pass."
+
+CONCLUSION: greedy decode produced the IDENTICAL token sequence with FA off, so
+passkey-loss and coherence are demonstrably FA-independent for this arm. All four
+Table II arms are now FA-off-matched. The FA parenthetical can be deleted and
+"the only difference between the two runs is the four preserved sink tokens"
+becomes literally true.

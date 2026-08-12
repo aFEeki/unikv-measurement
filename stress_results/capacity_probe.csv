@@ -1,0 +1,10 @@
+alloc_error,ctx,decode_tokens,duration_s,flash_attn,host_store_mib,kv_mib,loaded,metal_working_set_mib,n_alloc_errors,phase,policy,prefill_ms,prefill_tokens,rc,tag,timed_out,tok_per_sec
+,16384,1,2.1,disabled,,2048.0,True,17179.89,0,1,0,1180.34,512,0,p0_c16384,False,83333.333
+,32768,1,2.1,disabled,,4096.0,True,17179.89,0,1,0,1182.28,512,0,p0_c32768,False,111111.111
+,49152,1,2.6,disabled,,6144.0,True,17179.89,0,1,0,1205.46,512,0,p0_c49152,False,50000.0
+,65536,1,1.2,disabled,,8192.0,True,17179.89,0,1,0,13.85,512,0,p0_c65536,False,333333.333
+,73728,1,1.1,disabled,,9216.0,True,17179.89,0,1,0,48.67,512,0,p0_c73728,False,166666.667
+,81920,1,1.1,disabled,,10240.0,True,17179.89,0,1,0,11.98,512,0,p0_c81920,False,24390.244
+,98304,1,1.6,disabled,,12288.0,True,17179.89,0,1,0,13.59,512,0,p0_c98304,False,45454.545
+,131072,1,1.7,disabled,,16384.0,True,17179.89,0,1,0,67.4,512,0,p0_c131072,False,200000.0
+,4096,1,3.1,disabled,16384.0,512.0,True,17179.89,0,2,3,1223.37,512,0,p3_c4096_cap131072,False,58823.529

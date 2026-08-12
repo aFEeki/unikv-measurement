@@ -1,0 +1,13 @@
+arm,round,position,rc,decode_tokens,tok_per_sec,flash_attn,tier_device_visible,duration_s,t_start
+A_p3_cpu,1,1,0,1536,30.033,disabled,False,53.0,2026-08-06T18:13:53
+B_p3_dev,1,2,0,1536,37.813,disabled,True,42.5,2026-08-06T18:14:46
+C_p4_h2o,1,3,0,1536,41.645,disabled,False,38.9,2026-08-06T18:15:29
+B_p3_dev,2,1,0,1536,38.215,disabled,True,42.0,2026-08-06T18:16:08
+C_p4_h2o,2,2,0,1536,40.957,disabled,False,39.4,2026-08-06T18:16:50
+A_p3_cpu,2,3,0,1536,23.654,disabled,False,67.1,2026-08-06T18:17:29
+C_p4_h2o,3,1,0,1536,37.851,disabled,False,43.0,2026-08-06T18:18:36
+A_p3_cpu,3,2,0,1536,24.14,disabled,False,65.6,2026-08-06T18:19:19
+B_p3_dev,3,3,0,1536,34.874,disabled,True,46.6,2026-08-06T18:20:25
+C_p4_h2o,4,1,0,1536,37.364,disabled,False,43.5,2026-08-06T18:21:12
+B_p3_dev,4,2,0,1536,35.504,disabled,True,45.6,2026-08-06T18:21:55
+A_p3_cpu,4,3,0,1536,23.044,disabled,False,69.2,2026-08-06T18:22:41

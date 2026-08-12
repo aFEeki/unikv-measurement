@@ -1,0 +1,141 @@
+*** ALL THROUGHPUT AND gamma/delta NUMBERS HERE ARE SMOKE, SUPERSEDED
+    2026-08-07 by B2 (artifacts/b2_cooled/B2_analysis.txt). Two were wrong:
+      "delta fell by about half"  -> it falls 30.5% (t = 12.34)
+      "+24% device-visible"       -> +25.89% at C=1024 (close, but by luck)
+    STILL VALID: the bucket call (a), the two-CPU-pins finding and the 41-split
+    diagnosis, the device-memory accounting, and the token-ID identity check.
+    Those are structural, not timing. ***
+
+B1 triage — GPU-side spilled tier
+=================================
+2026-08-06. Code: llama.cpp/src/{llama-unikv-spill.h,llama-unikv-spill.cpp,
+llama-kv-cache.cpp,llama-graph.cpp}. Gate: UNIKV_SPILL_DEV=1.
+Default (env unset) is byte-identical to the previous behaviour, so every
+existing number stands.
+Scratch data: smoke runs only, listed inline; NO protocol numbers here.
+
+BUCKET: (a) — backend-assignment / buffer-type change. ~2 hours, it builds,
+it runs, and it is faster. Details and the catch below.
+
+WHAT THE CHANGE IS
+------------------
+Two parts, both small:
+
+1. Allocate the spilled tier from the resident cache's OWN buffer type instead
+   of ggml_backend_cpu_buffer_type(). On Metal with unified memory that resolves
+   to the shared buffer type, which is `ggml_metal_host_malloc` memory wrapped
+   with `newBufferWithBytesNoCopy` + `MTLResourceStorageModeShared` — genuinely
+   zero-copy: the same physical pages, addressable by both processors. The
+   hypothesis in the brief was correct.
+
+2. Remove the CPU pins. There are TWO, not one:
+       build_attn_mha_unikv: ggml_backend_sched_set_tensor_backend(kq_spill,  cpu)
+       build_attn_mha_unikv: ggml_backend_sched_set_tensor_backend(kqv_spill, cpu)
+
+THE TRAP, RECORDED BECAUSE IT COST AN HOUR AND WOULD COST ANYONE ELSE THE SAME
+------------------------------------------------------------------------------
+Gating only the first pin makes the system SLOWER, not faster:
+
+    CPU-pinned (both pins)          30.4 tok/s
+    device buffer, first pin gated  22.9 tok/s   <- worse
+    device buffer, both pins gated  38.4 tok/s
+
+With one pin gated the graph half-migrates: the score matmul runs on Metal while
+the V matmul stays pinned to the CPU, so the scheduler inserts a CPU split per
+layer and copies the permuted spilled-V view across the boundary every step.
+GGML_SCHED_DEBUG=2 shows it plainly — 41 CPU splits, each
+`## SPLIT #n: CPU # 2 inputs: [unikv_spill_v_lN (view) (permuted) (7M)] ...`.
+Output also diverged from the CPU-pinned reference in that configuration.
+
+Anyone measuring the "GPU-side tier" after removing the obvious pin would
+conclude the idea does not work. It does; the graph just has to be migrated
+whole. (Metal's supports_op for MUL_MAT is permissive — it was never the
+blocker. The blocker was our own pin.)
+
+RESULT WITH BOTH PINS GATED (smoke, n=1, no cooldowns — direction only)
+------------------------------------------------------------------------
+512-token prompt, C=1024, 1536 decode, -fa off, seed 123:
+
+    mode            tok/s    avg CPU cores    token IDs
+    CPU-pinned      30.99             7.01    reference
+    device-visible  38.44             1.97    IDENTICAL
+
++24% throughput; CPU occupancy falls 3.6x, which is the direct evidence that the
+spilled-tier work actually moved to the GPU rather than merely being allowed to.
+Exactness survives: the sampled token-ID sequences are identical, so the
+lossless property the whole design exists for is preserved.
+
+THE CATCH, AND IT IS NOT SMALL
+-------------------------------
+The tier now counts against the Metal working set. Same run, 8192-cell
+(1024 MiB) spill capacity, from memory_breakdown:
+
+    CPU-pinned      MTL0 free 11311 MiB   unaccounted    0 MiB
+    device-visible  MTL0 free 10287 MiB   unaccounted 1024 MiB
+
+Free device memory drops by exactly the tier size. So device memory becomes
+O(C) + O(spill capacity) rather than O(C). The bounded-device-memory property —
+the entire justification for pinning to the CPU in the first place, and the
+thing that makes the Finding 4 capacity comparison work — is what is being
+traded away for the 24%.
+
+Worse for the accounting: the store is allocated at CAPACITY, not at live
+occupancy, so the full UNIKV_SPILL_CAP is charged up front whether or not
+anything has spilled.
+
+This is a genuine architectural trade and it must be presented as one. A
+GPU-side tier is not a free improvement to the current design; it is a
+different point on the memory/throughput curve, and it moves the design back
+toward the capacity wall that Finding 4 is about.
+
+AGAINST THE FALSIFIABLE PREDICTION
+-----------------------------------
+The brief predicted: gamma falls substantially, delta stays roughly put, since
+delta is the data term and gamma is the handoff.
+
+Smoke estimates from three isochronal points (0 / 512 / 8192 cells), n=1, no
+cooldowns, hot machine — DIRECTIONAL ONLY, superseded by B2 if it runs:
+
+    mode            gamma (fixed)    delta (per cell)
+    CPU-pinned          ~8.9 ms         ~4.5 us/cell
+    device-visible      ~2.3 ms         ~2.3 us/cell
+
+  - gamma: CONFIRMED, and strongly — roughly a 4x fall. The fixed term really is
+    a handoff cost, and removing the handoff removes most of it.
+  - delta: NOT confirmed. It fell by about half as well. So delta is not a
+    location-independent data term: streaming the spilled K/V is cheaper on the
+    GPU because the GPU has more bandwidth to the same physical memory. The
+    "delta is the data term and stays put" half of the prediction is wrong, and
+    the interesting consequence is that on unified memory even the data term
+    depends on which processor touches the data.
+
+(The CPU-pinned delta here, ~4.5 us/cell, is above the protocol value of
+3.29 us/cell because these smoke runs are uncooled and sequential. That is
+exactly why they are not being reported as numbers.)
+
+WHAT B2 WOULD NEED TO MEASURE, IF IT RUNS
+------------------------------------------
+1. Fresh isochronal sweep in device mode, same targets, under protocol — for a
+   real gamma/delta rather than the smoke above. Given the delta surprise, the
+   sweep is now more interesting than it was when it was scoped.
+2. Fresh 4-arm policy block at C=1024 (rolling window, H2O, CPU-spill,
+   GPU-spill), 3 trials — the new headline gap against H2O. On smoke numbers
+   38.4 vs H2O's 41.4 would narrow the exactness premium from ~30% to under
+   10%, which if it holds is the most consequential number in the extended
+   version.
+3. Device memory at matched spill capacity, so the trade is reported in both
+   directions rather than only the flattering one.
+
+Both blocks fresh, not spliced against existing numbers.
+
+RESIDUAL RISKS BEFORE COMMITTING TO B2
+---------------------------------------
+- Only exercised at C=1024 with caps of 4096-8192 cells. A large cap in
+  device-visible mode will hit the Metal working-set ceiling that Finding 4
+  documents; at some capacity this configuration simply will not allocate. That
+  boundary is unmeasured and should be found before any long run is scheduled.
+- The shared buffer type is Metal-specific. On a discrete-memory backend this
+  change is meaningless (there the CPU pin is doing real work), so the finding
+  is explicitly a unified-memory one.
+- Smoke runs only. Nothing here is a protocol number and nothing here should be
+  quoted in the paper as measured.

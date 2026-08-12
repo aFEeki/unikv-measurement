@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / workspace
+*.code-workspace
+
+# LaTeX build products
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# Internal working notes and pre-publication review documents.
+# These are drafting aids, not peer review, and are kept out of the
+# public artifact so they cannot be mistaken for it.
+notes/
+REVIEW_*.md
+RE_REVIEW_*.md
+THESIS_ASSESSMENT_*.md
+REVISION_LOG.md
+PROJECT_STATE.md
+HANDOFF.md
+paper/*_copy*.pdf

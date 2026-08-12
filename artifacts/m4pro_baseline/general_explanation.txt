@@ -1,0 +1,17 @@
+General Explanation of the Apple M4 Pro llama.cpp Metal Baseline
+
+This baseline documents how llama.cpp was set up and tested on an Apple M4 Pro system using the Metal backend and unified memory. The goal of the run was to establish a reproducible reference point for later research on KV cache policy design under long-context inference workloads.
+
+The implementation was built from the official ggml-org/llama.cpp repository with a fresh Metal-enabled build directory. On macOS, Metal support is enabled by default in the CMake build, but the recorded build commands explicitly preserve that configuration for reproducibility. Inference was run with full layer offload to Metal so the Apple GPU and unified memory subsystem were exercised during the tests.
+
+The model used for the baseline was Llama 3.1 8B Instruct in GGUF format with Q4_K_M quantization. The exact downloaded artifact, SHA256 hash, build commands, and inference commands are all recorded in baseline_m4pro.csv so the setup can be reproduced without ambiguity.
+
+To keep runs comparable, the benchmark used a fixed deterministic prompt construction. Instead of relying on a natural-language prompt whose tokenization might vary unexpectedly, the prompt was built to hit exact token counts for each requested context length. For each context size, the prompt filled the context up to 256 reserved generation tokens, which means the test measured performance under near-full-context conditions rather than simply allocating a larger KV cache without using it.
+
+The collected metrics include decode throughput in tokens per second and time to first token in milliseconds at context lengths of 4096, 8192, 16384, and 32768 tokens. Raw logs for each run were preserved under artifacts/m4pro_baseline/logs, and the prompt files used for each benchmark were preserved under artifacts/m4pro_baseline/prompts.
+
+The benchmark confirms that Metal was active during inference on the Apple M4 Pro GPU. The runtime logs show the Metal backend detecting the Apple M4 Pro device, enabling GPU offload, and using unified memory. All transformer layers were offloaded to the GPU in the measured runs.
+
+The baseline also probed the upper stable context boundary for this configuration. In this setup, inference remained stable through 196608 tokens, while 197632 tokens produced a Metal out-of-memory failure. That makes 196608 tokens the maximum stable context length observed for this specific model, quantization, backend configuration, and machine state during testing.
+
+These results should be interpreted as a system-specific baseline rather than an absolute hardware limit. Long-context stability and throughput can change with different llama.cpp revisions, model quantizations, KV cache types, flash attention settings, background memory pressure, and OS or driver behavior. Even so, this baseline provides a concrete reference point for evaluating future KV cache policy changes on Apple unified-memory hardware.

@@ -1,0 +1,45 @@
+=== STDOUT ===
+ the pass key is the pass key is the pass key is the pass key is the pass key is the pass key is the pass key is the pass key is
+UNIKV_E2E decode_tokens=32 decode_ms=748.562 tok_per_sec=42.749
+
+
+
+=== STDERR (tail) ===
+sed=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+UNIKV_GAP decode-entry: seq_pos=[0,1023] span=1024 used=1024 gap=0
+UNIKV_GAP after-shift: survivors seq_pos=[0,1022] span=1023 used=1023 n_tok=1 delta=-1
+common_perf_print:    sampling time =       2.36 ms
+common_perf_print:    samplers time =       1.45 ms /  3866 tokens
+common_perf_print:        load time =    1142.44 ms
+common_perf_print: prompt eval time =    8703.39 ms /  3834 tokens (    2.27 ms per token,   440.52 tokens per second)
+common_perf_print:        eval time =     745.35 ms /    31 runs   (   24.04 ms per token,    41.59 tokens per second)
+common_perf_print:       total time =    9454.11 ms /  3865 tokens
+common_perf_print: unaccounted time =       3.01 ms /   0.0 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =          0
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 11303 + (5079 =  4685 +     128 +     266) +           0 |
+common_memory_breakdown_print: |   - Host                |                   299 =   281 +       0 +      18                |
+ggml_metal_free: deallocating

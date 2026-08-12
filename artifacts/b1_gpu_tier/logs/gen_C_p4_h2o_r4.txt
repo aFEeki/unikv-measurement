@@ -1,0 +1,141 @@
+=== STDOUT ===
+ token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token
+UNIKV_E2E decode_tokens=1536 decode_ms=41109.127 tok_per_sec=37.364
+
+
+
+=== STDERR ===
+ cells; 902 evicted in total
+decode: unikv: h2o evicted 1 cells; 903 evicted in total
+decode: unikv: h2o evicted 1 cells; 904 evicted in total
+decode: unikv: h2o evicted 1 cells; 905 evicted in total
+decode: unikv: h2o evicted 1 cells; 906 evicted in total
+decode: unikv: h2o evicted 1 cells; 907 evicted in total
+decode: unikv: h2o evicted 1 cells; 908 evicted in total
+decode: unikv: h2o evicted 1 cells; 909 evicted in total
+decode: unikv: h2o evicted 1 cells; 910 evicted in total
+decode: unikv: h2o evicted 1 cells; 911 evicted in total
+decode: unikv: h2o evicted 1 cells; 912 evicted in total
+decode: unikv: h2o evicted 1 cells; 913 evicted in total
+decode: unikv: h2o evicted 1 cells; 914 evicted in total
+decode: unikv: h2o evicted 1 cells; 915 evicted in total
+decode: unikv: h2o evicted 1 cells; 916 evicted in total
+decode: unikv: h2o evicted 1 cells; 917 evicted in total
+decode: unikv: h2o evicted 1 cells; 918 evicted in total
+decode: unikv: h2o evicted 1 cells; 919 evicted in total
+decode: unikv: h2o evicted 1 cells; 920 evicted in total
+decode: unikv: h2o evicted 1 cells; 921 evicted in total
+decode: unikv: h2o evicted 1 cells; 922 evicted in total
+decode: unikv: h2o evicted 1 cells; 923 evicted in total
+decode: unikv: h2o evicted 1 cells; 924 evicted in total
+decode: unikv: h2o evicted 1 cells; 925 evicted in total
+decode: unikv: h2o evicted 1 cells; 926 evicted in total
+decode: unikv: h2o evicted 1 cells; 927 evicted in total
+decode: unikv: h2o evicted 1 cells; 928 evicted in total
+decode: unikv: h2o evicted 1 cells; 929 evicted in total
+decode: unikv: h2o evicted 1 cells; 930 evicted in total
+decode: unikv: h2o evicted 1 cells; 931 evicted in total
+decode: unikv: h2o evicted 1 cells; 932 evicted in total
+decode: unikv: h2o evicted 1 cells; 933 evicted in total
+decode: unikv: h2o evicted 1 cells; 934 evicted in total
+decode: unikv: h2o evicted 1 cells; 935 evicted in total
+decode: unikv: h2o evicted 1 cells; 936 evicted in total
+decode: unikv: h2o evicted 1 cells; 937 evicted in total
+decode: unikv: h2o evicted 1 cells; 938 evicted in total
+decode: unikv: h2o evicted 1 cells; 939 evicted in total
+decode: unikv: h2o evicted 1 cells; 940 evicted in total
+decode: unikv: h2o evicted 1 cells; 941 evicted in total
+decode: unikv: h2o evicted 1 cells; 942 evicted in total
+decode: unikv: h2o evicted 1 cells; 943 evicted in total
+decode: unikv: h2o evicted 1 cells; 944 evicted in total
+decode: unikv: h2o evicted 1 cells; 945 evicted in total
+decode: unikv: h2o evicted 1 cells; 946 evicted in total
+decode: unikv: h2o evicted 1 cells; 947 evicted in total
+decode: unikv: h2o evicted 1 cells; 948 evicted in total
+decode: unikv: h2o evicted 1 cells; 949 evicted in total
+decode: unikv: h2o evicted 1 cells; 950 evicted in total
+decode: unikv: h2o evicted 1 cells; 951 evicted in total
+decode: unikv: h2o evicted 1 cells; 952 evicted in total
+decode: unikv: h2o evicted 1 cells; 953 evicted in total
+decode: unikv: h2o evicted 1 cells; 954 evicted in total
+decode: unikv: h2o evicted 1 cells; 955 evicted in total
+decode: unikv: h2o evicted 1 cells; 956 evicted in total
+decode: unikv: h2o evicted 1 cells; 957 evicted in total
+decode: unikv: h2o evicted 1 cells; 958 evicted in total
+decode: unikv: h2o evicted 1 cells; 959 evicted in total
+decode: unikv: h2o evicted 1 cells; 960 evicted in total
+decode: unikv: h2o evicted 1 cells; 961 evicted in total
+decode: unikv: h2o evicted 1 cells; 962 evicted in total
+decode: unikv: h2o evicted 1 cells; 963 evicted in total
+decode: unikv: h2o evicted 1 cells; 964 evicted in total
+decode: unikv: h2o evicted 1 cells; 965 evicted in total
+decode: unikv: h2o evicted 1 cells; 966 evicted in total
+decode: unikv: h2o evicted 1 cells; 967 evicted in total
+decode: unikv: h2o evicted 1 cells; 968 evicted in total
+decode: unikv: h2o evicted 1 cells; 969 evicted in total
+decode: unikv: h2o evicted 1 cells; 970 evicted in total
+decode: unikv: h2o evicted 1 cells; 971 evicted in total
+decode: unikv: h2o evicted 1 cells; 972 evicted in total
+decode: unikv: h2o evicted 1 cells; 973 evicted in total
+decode: unikv: h2o evicted 1 cells; 974 evicted in total
+decode: unikv: h2o evicted 1 cells; 975 evicted in total
+decode: unikv: h2o evicted 1 cells; 976 evicted in total
+decode: unikv: h2o evicted 1 cells; 977 evicted in total
+decode: unikv: h2o evicted 1 cells; 978 evicted in total
+decode: unikv: h2o evicted 1 cells; 979 evicted in total
+decode: unikv: h2o evicted 1 cells; 980 evicted in total
+decode: unikv: h2o evicted 1 cells; 981 evicted in total
+decode: unikv: h2o evicted 1 cells; 982 evicted in total
+decode: unikv: h2o evicted 1 cells; 983 evicted in total
+decode: unikv: h2o evicted 1 cells; 984 evicted in total
+decode: unikv: h2o evicted 1 cells; 985 evicted in total
+decode: unikv: h2o evicted 1 cells; 986 evicted in total
+decode: unikv: h2o evicted 1 cells; 987 evicted in total
+decode: unikv: h2o evicted 1 cells; 988 evicted in total
+decode: unikv: h2o evicted 1 cells; 989 evicted in total
+decode: unikv: h2o evicted 1 cells; 990 evicted in total
+decode: unikv: h2o evicted 1 cells; 991 evicted in total
+decode: unikv: h2o evicted 1 cells; 992 evicted in total
+decode: unikv: h2o evicted 1 cells; 993 evicted in total
+decode: unikv: h2o evicted 1 cells; 994 evicted in total
+decode: unikv: h2o evicted 1 cells; 995 evicted in total
+decode: unikv: h2o evicted 1 cells; 996 evicted in total
+decode: unikv: h2o evicted 1 cells; 997 evicted in total
+decode: unikv: h2o evicted 1 cells; 998 evicted in total
+decode: unikv: h2o evicted 1 cells; 999 evicted in total
+decode: unikv: h2o evicted 1 cells; 1000 evicted in total
+decode: unikv: h2o evicted 1 cells; 1001 evicted in total
+decode: unikv: h2o evicted 1 cells; 1002 evicted in total
+decode: unikv: h2o evicted 1 cells; 1003 evicted in total
+decode: unikv: h2o evicted 1 cells; 1004 evicted in total
+decode: unikv: h2o evicted 1 cells; 1005 evicted in total
+decode: unikv: h2o evicted 1 cells; 1006 evicted in total
+decode: unikv: h2o evicted 1 cells; 1007 evicted in total
+decode: unikv: h2o evicted 1 cells; 1008 evicted in total
+decode: unikv: h2o evicted 1 cells; 1009 evicted in total
+decode: unikv: h2o evicted 1 cells; 1010 evicted in total
+decode: unikv: h2o evicted 1 cells; 1011 evicted in total
+decode: unikv: h2o evicted 1 cells; 1012 evicted in total
+decode: unikv: h2o evicted 1 cells; 1013 evicted in total
+decode: unikv: h2o evicted 1 cells; 1014 evicted in total
+decode: unikv: h2o evicted 1 cells; 1015 evicted in total
+decode: unikv: h2o evicted 1 cells; 1016 evicted in total
+decode: unikv: h2o evicted 1 cells; 1017 evicted in total
+decode: unikv: h2o evicted 1 cells; 1018 evicted in total
+decode: unikv: h2o evicted 1 cells; 1019 evicted in total
+decode: unikv: h2o evicted 1 cells; 1020 evicted in total
+decode: unikv: h2o evicted 1 cells; 1021 evicted in total
+decode: unikv: h2o evicted 1 cells; 1022 evicted in total
+decode: unikv: h2o evicted 1 cells; 1023 evicted in total
+common_perf_print:    sampling time =     179.37 ms
+common_perf_print:    samplers time =     116.99 ms /  2048 tokens
+common_perf_print:        load time =    1248.61 ms
+common_perf_print: prompt eval time =    1248.23 ms /   512 tokens (    2.44 ms per token,   410.18 tokens per second)
+common_perf_print:        eval time =   40916.06 ms /  1535 runs   (   26.66 ms per token,    37.52 tokens per second)
+common_perf_print:       total time =   42358.20 ms /  2047 tokens
+common_perf_print: unaccounted time =      14.54 ms /   0.0 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =       1533
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 11297 + (5085 =  4685 +     128 +     272) +           0 |
+common_memory_breakdown_print: |   - Host                |                   303 =   281 +       0 +      22                |
+ggml_metal_free: deallocating

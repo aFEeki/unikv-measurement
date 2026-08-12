@@ -1,0 +1,2 @@
+order_idx,arm,ctx,policy,trial,rc,decode_tokens,tok_per_sec,flash_attn,kv_device_mib,spill_log_lines,retained,step_shift_events,t_start_iso,duration_s
+1,p4_c1024,1024,4,1,0,2048,41.163,disabled,128.0,1535,0,,2026-08-04T22:22:24,51.9

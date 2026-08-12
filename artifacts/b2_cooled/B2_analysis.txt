@@ -1,0 +1,169 @@
+B2 — protocol numbers for the two spilled-tier modes
+====================================================
+Run 2026-08-07, 00:59-05:2x, machine idle. Harness: scripts/run_b2_cooled.py
+Data: stress_results/b2_isochronal_both_modes.csv (38 runs)
+      stress_results/b2_policy_block.csv          (30 runs)
+Logs: artifacts/b2_cooled/logs/
+Protocol: seed 123, temp 0, greedy, EOS disabled, -fa off verified per run from
+its own log (68/68 report disabled, 68/68 rc=0), 200 s cooldowns.
+
+These supersede everything from B1, which was smoke. Two numbers reported from
+B1 were wrong and are corrected below.
+
+*** TWO CORRECTIONS TO WHAT B1 REPORTED ***
+ 1. "delta fell by about half" -> it falls 30.5%. Real and overwhelming
+    (t = 12.34), but smaller than the smoke suggested.
+ 2. "the exactness premium is under 10%" -> at C=1024 it is 11.4%. It is under
+    10% only at C=2048, where it is 1.3%.
+
+===========================================================================
+BLOCK 1 — isochronal recall cost, both modes
+===========================================================================
+Per-step cost at controlled spilled-set size, C=1024, burst of 128 decode steps
+with the first 32 discarded (the one-off graph-realloc step after prefill).
+Instrumented by necessity: per-step wall clock IS the measurement. n=3 per
+point, except CPU-pinned n_spill=4096 which got 5.
+
+  n_spill    CPU-pinned ms/step      device-visible ms/step
+        0      22.554 +/- 0.034        22.544 +/- 0.052
+      512      33.958 +/- 0.085        26.552 +/- 0.064
+     1024      34.702 +/- 0.153        27.639 +/- 0.063
+     2048      37.344 +/- 0.200        29.773 +/- 0.077
+     4096      43.892 +/- 0.696 (n=5)  34.264 +/- 0.021
+     8192      57.349 +/- 1.456        43.063 +/- 0.028
+
+  CPU-pinned      t = 31.563 ms + 3.0990 us/cell   SE 0.0764, resid SD 0.832
+                  gamma = 31.563 - 22.554 = 9.009 ms
+  device-visible  t = 25.423 ms + 2.1531 us/cell   SE 0.0055, resid SD 0.059
+                  gamma = 25.423 - 22.544 = 2.879 ms
+
+Q1 — DO THE NO-SPILL REFERENCES AGREE?  YES.
+  22.554 vs 22.544 ms, difference -0.010 ms, SE 0.036, t = -0.28.
+  With nothing spilled the tier is inert and the two modes are indistinguishable.
+  The buffer allocation does nothing at idle, so the modes are cleanly
+  comparable and the gamma/delta differences below are not an allocation
+  artefact.
+
+Q2 — ARE THE TWO SLOPES SEPARABLE?  YES, DECISIVELY.
+  delta CPU-pinned     = 3.0990 +/- 0.0764 us/cell
+  delta device-visible = 2.1531 +/- 0.0055 us/cell
+  difference           = 0.9459 +/- 0.0766 us/cell,  t = 12.34
+  Device-visible delta is 30.5% lower. This survives the test comfortably, so
+  the difference can be reported as measured rather than as a direction.
+
+WHAT THE TWO TERMS SAY
+  gamma  9.009 -> 2.879 ms, a 68% fall. The fixed term is a handoff cost, and
+         removing the CPU handoff removes about two thirds of it. What remains
+         (2.879 ms) is the cost of the two-tier graph shape itself -- the
+         separate score matmul, the concat, the union softmax -- which does not
+         go away by moving processors.
+  delta  3.0990 -> 2.1531 us/cell, a 30.5% fall. This is the half of the
+         prediction that was wrong: delta is NOT a location-independent data
+         term. Streaming the spilled tier is measurably cheaper on the GPU,
+         which has more bandwidth to the same physical pages. On unified memory
+         even the data term depends on which processor touches the data.
+
+THE n_spill=4096 ANOMALY IS RESOLVED
+  Earlier sweep: 5 trials spanning 44.0-60.9 ms, sd 7.0, where every other point
+  repeated under 0.5 ms. Re-run on a quiet machine: 43.892 +/- 0.696, and the
+  mean sits at the bottom of the old range. It was background machine activity.
+  The mystery is deleted, not confirmed, and the point now carries no more
+  weight than its neighbours.
+
+REPRODUCIBILITY ACROSS NIGHTS (CPU-pinned, vs the earlier protocol sweep)
+  gamma   9.03  -> 9.009 ms
+  delta   3.289 +/- 0.086 -> 3.0990 +/- 0.0764 us/cell
+  The affine model reproduces on a different night with a rebuilt binary.
+
+PRECISION IS ITSELF A RESULT
+  Residual SD 0.832 ms (CPU-pinned) against 0.059 ms (device-visible), a factor
+  of 14. And CPU-pinned scatter GROWS with the spilled set (sd 0.085 at 512 ->
+  1.456 at 8192) while device-visible stays flat (0.064 -> 0.028). The
+  CPU-pinned path is not merely slower; its cost is less predictable, and
+  increasingly so as the tier grows. Same processor-dependent throttling the
+  interleaved A/B showed, now visible inside the cost curve.
+
+===========================================================================
+BLOCK 2 — policy comparison, five arms
+===========================================================================
+512-token prompt + 2048-token decode budget, uninstrumented. p3_cpu
+position-balanced at slots 2, 10, 14, 16, 22, 28 of 30 (one per sixth); all
+other arms randomised.
+
+  arm                        C=1024                C=2048
+  upstream (halts)      43.39 +/- 0.04  (512)  41.51 +/- 0.03  (1536)
+  rolling window        39.40 +/- 0.16 (2048)  39.38 +/- 0.01 (2048)
+  H2O                   42.42 +/- 0.01 (2048)  40.17 +/- 0.04 (2048)
+  exact, CPU-pinned     30.24 +/- 0.15 (2048)  35.62 +/- 0.25 (2048)
+  exact, device-visible 38.07 +/- 0.01 (2048)  39.64 +/- 0.01 (2048)
+
+EXACTNESS PREMIUM (how much faster the lossy comparator is)
+                        vs H2O        vs rolling window
+  C=1024  CPU-pinned    +40.26%       +30.27%
+  C=1024  device-visible +11.42%       +3.48%
+  C=2048  CPU-pinned    +12.77%       +10.54%
+  C=2048  device-visible  +1.33%       -0.67%
+
+  At C=2048 with a device-visible tier, exact retention is within 1.3% of H2O
+  and marginally FASTER than the rolling window (39.64 vs 39.38). Exactness is
+  close to free at that budget. At C=1024 it costs 11.4% against H2O.
+
+  The premium therefore depends strongly on how much is spilled: 1535 cells at
+  C=1024 against 511 at C=2048. That is the same scaling Block 1 measures
+  directly, and the two blocks agree.
+
+POSITION AUDIT OF THE BALANCED ARM
+  slot2=35.38 (C=2048)   slot10=30.07 (C=1024)  slot14=35.88 (C=2048)
+  slot16=30.28 (C=1024)  slot22=35.61 (C=2048)  slot28=30.37 (C=1024)
+  Values cluster by CONTEXT, not by slot: the three C=2048 runs (slots 2, 14,
+  22) span 35.38-35.88 and the three C=1024 runs (slots 10, 16, 28) span
+  30.07-30.37, with no trend across the block. The balancing worked and shows
+  no thermal-position effect to correct for.
+
+===========================================================================
+WHY THE INTERLEAVED A/B DISAGREED, AND WHAT IT MEANS FOR METHOD
+===========================================================================
+                          A/B (uncooled)   B2 (protocol)
+  p3_cpu                        25.22          30.24   (+19.9%)
+  p3_dev                        36.60          38.07   ( +4.0%)
+  p4_h2o                        39.45          42.42   ( +7.5%)
+  premium H2O over p3_dev       +7.77%        +11.42%
+  speedup p3_dev over p3_cpu   +46.50%        +25.89%
+
+Every arm is faster on a cool quiet machine, but by very different amounts, and
+the CPU-pinned arm gains most (+19.9%) because it was the most degraded. That
+biases the two headline comparisons in OPPOSITE directions: the uncooled
+session overstated the device-visible speedup (46.5% vs 25.9%) and understated
+the exactness premium (7.8% vs 11.4%).
+
+The methodological point is worth a sentence in the paper. Counterbalancing
+protects against ORDER effects within a session; it does not protect against an
+arm being systematically more sensitive to the session's overall thermal LEVEL.
+When arms differ in which processor they load, only a cooled block gives
+comparable numbers -- interleaving is not a substitute for it, merely a cheaper
+guard against a different failure.
+
+Note also that the original B1 smoke (+24% for device-visible over CPU-pinned)
+was closer to the protocol value (+25.9%) than the more carefully designed
+interleaved A/B (+46.5%) was. That is not an argument for smoke; it is a
+reminder that a single lucky comparison is not evidence, and that the A/B's
+error was systematic rather than random -- which is exactly the kind a larger n
+does not fix.
+
+===========================================================================
+LIMITS
+===========================================================================
+- n=3 per point (5 at CPU-pinned n_spill=4096). SDs are small but this is one
+  machine on one night.
+- Block 1 is instrumented; its ms/step values carry the per-step synchronize()
+  pair and are NOT comparable to Block 2's uninstrumented tok/s. The two blocks
+  are internally consistent, not cross-comparable.
+- Block 1 fits are over n_spill <= 8192. The earlier finding that the cost turns
+  superlinear beyond ~10^4 cells (measured at 61471) was made in CPU-pinned mode
+  and has NOT been re-measured device-visible; do not extrapolate either fit
+  past its range.
+- The device-visible mode's throughput advantage comes with the bounded-device
+  property removed (B1: charged at spill capacity, ceiling 81920-90112 cells).
+  Neither block re-measures that, and no throughput number here should be quoted
+  without it.
+- One model, one quantisation, one device, ubatch 512.

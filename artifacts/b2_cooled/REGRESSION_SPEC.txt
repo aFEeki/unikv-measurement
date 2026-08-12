@@ -1,0 +1,74 @@
+Regression specification for Equations (1) and (2) of the measurement paper
+================================================================================
+Written 2026-08-12 to close a traceability gap. No new runs; this re-states the
+exact fit behind the published coefficients so a reader can reproduce them from
+the CSV alone.
+
+WHY THIS FILE EXISTS
+--------------------
+B2_analysis.txt reports the same fit against the harness's TARGET spilled-set
+size and therefore prints intercepts of 31.563 and 25.423 ms. The paper regresses
+against the MEASURED spilled-set size and prints 31.317 and 25.252 ms. Both are
+correct; they differ only in the regressor. Nothing else changes, because the
+measured size exceeds the target by a constant 79.5 cells at every spilling
+point, so the shift moves the intercept by slope x 79.5 and leaves the slope,
+its standard error and the residual SD identical:
+
+  CPU-pinned      3.0990 us/cell x 79.5 cells = 0.246 ms   31.563 - 0.246 = 31.317
+  device-visible  2.1531 us/cell x 79.5 cells = 0.171 ms   25.423 - 0.171 = 25.252
+
+The paper uses the measured regressor because gamma is defined against the
+no-spill reference, and an intercept fitted on targets is not the cost at zero
+retained cells.
+
+THE FIT
+-------
+Data:      stress_results/b2_isochronal_both_modes.csv
+Filter:    rc == 0, and target > 0
+           (the target = 0 cells are the no-spill references, not points on the
+           affine branch; they are used for gamma, not for the fit)
+Unit:      one run = one observation. This is a per-run fit, NOT a fit on the six
+           cell means. Fitting cell means instead gives 3.105 / 2.153 us/cell
+           with a much larger standard error, because five points carry three
+           degrees of freedom; the difference is immaterial to every claim but
+           the published SEs only reproduce per-run.
+Regressor: n_spill_mean  (measured, from the run's own log)
+Response:  ms_mean  for the published coefficients
+           ms_median for the estimator-sensitivity check
+n:         17 CPU-pinned, 15 device-visible
+
+RESULT — reproduces the paper exactly
+--------------------------------------
+  CPU-pinned      t = 31.317 ms + 3.0990 us/cell   SE 0.0764   resid SD 0.832
+  device-visible  t = 25.252 ms + 2.1531 us/cell   SE 0.0055   resid SD 0.059
+
+  no-spill references (target = 0, ms_mean):  22.554 and 22.544 ms
+  gamma = intercept - own no-spill reference:  8.763 and 2.708 ms   (69.1% fall)
+  slope separability: (3.0990 - 2.1531) / sqrt(0.0764^2 + 0.0055^2) = t = 12.35
+  delta reduction on means:    30.5%
+  delta reduction on medians:  2.8531 -> 2.1549 us/cell = 24.5%
+  device-visible slope, means vs medians: +0.08% (essentially all of the
+  estimator sensitivity is in the CPU-pinned arm)
+
+  Validity boundary quoted in the paper: at n_spill = 61471,
+  31.317 + 3.0990e-3 * 61471 = 221.8 ms, printed as 222; the measured
+  666 ms exceeds it by 200%.
+
+REPRODUCE
+---------
+  python3 - <<'PY'
+  import csv, statistics as st
+  rows=[r for r in csv.DictReader(open('stress_results/b2_isochronal_both_modes.csv'))
+        if r['rc']=='0' and float(r['target'])>0]
+  for dev,lab in ((False,'CPU-pinned'),(True,'device-visible')):
+      s=[r for r in rows if (r['tier_device_visible']=='True')==dev]
+      x=[float(r['n_spill_mean']) for r in s]; y=[float(r['ms_mean']) for r in s]
+      mx,my=st.mean(x),st.mean(y); sxx=sum((v-mx)**2 for v in x)
+      b=sum((u-mx)*(v-my) for u,v in zip(x,y))/sxx; a=my-b*mx
+      s2=sum((v-(a+b*u))**2 for u,v in zip(x,y))/(len(x)-2)
+      print(lab, round(a,3), round(b*1000,4), round((s2/sxx)**.5*1000,4), round(s2**.5,3))
+  PY
+
+Related: B2_analysis.txt (the source analysis, target regressor),
+         artifacts/recall_cost/recall_cost_analysis.txt (the isochronal design),
+         scripts/run_b2_cooled.py (harness), scripts/make_fig5_recall_cost.py.

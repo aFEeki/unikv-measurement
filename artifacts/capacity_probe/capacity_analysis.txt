@@ -1,0 +1,191 @@
+*** RATIO CORRECTION 2026-08-07: the 'x budget' figures below were
+    recomputed against 16384 MiB (= 17179.89 MB) after a MB/MiB unit
+    error was found. MiB values and all outcomes are unchanged.
+    See artifacts/CORRECTION_2026-08-07_budget_units.txt ***
+
+Capacity-bounded overflow — where the hardware, not -c, is the constraint
+=========================================================================
+Run 2026-08-04. Harnesses: scripts/run_capacity_probe.py (allocation boundary),
+scripts/run_capacity_workload.py (cost of an over-large C),
+scripts/run_capacity_demo.py (the workload above stock's ceiling).
+Data: stress_results/capacity_probe.csv, capacity_workload.csv, capacity_demo.csv
+Logs: artifacts/capacity_probe/logs/, workload_logs/, demo_logs/, bisect.log
+Addresses review items M2, P1, C4, and the un-instantiated "Why not simply
+enlarge the cache?" argument in the Discussion.
+
+QUESTION
+--------
+Every overflow experiment in the paper overflows because -c was set below the
+workload on a machine that completes the same workload at C=4096. The reviewer's
+fix: find a configuration where enlarging -c is genuinely unavailable, e.g. C
+sized so KV approaches Metal's ~17.2 GB recommendedMaxWorkingSetSize, and show
+stock failing for a hardware reason where UniKV completes.
+
+FINDING 1 — THE REVIEWER'S SUGGESTED EXPERIMENT DOES NOT WORK AS STATED
+------------------------------------------------------------------------
+Allocation is not the binding step. Probing stock (policy 0) with a short prompt
+at C = 16384 ... 131072, EVERY context loaded successfully, including:
+
+  C = 131072:  model 4685 MiB + KV 16384 MiB + compute scratch 8468 MiB
+             = 29537 MiB of device buffers, against a reported
+               recommendedMaxWorkingSetSize of 16383 MiB  (1.80x the budget)
+             -> rc=0, ran, generated its token.
+
+recommendedMaxWorkingSetSize is advisory, and macOS backs unified-memory buffers
+lazily, so a context whose buffers cannot possibly be resident still "loads".
+Anyone testing this by allocation alone concludes, wrongly, that there is no
+capacity limit.
+
+FINDING 2 — THE LIMIT IS REAL, AND IT APPEARS AT EXECUTION
+------------------------------------------------------------
+Give the same configurations a 16384-token prompt, so the memory is actually
+touched (artifacts/capacity_probe/bisect.log, workload_logs/):
+
+  C       KV MiB  scratch MiB  device MiB  x budget  result
+  32768     4096         2132       10913     0.67    completes, 282.6 tok/s prefill
+  49152     6144         3188       14017     0.86    completes, 280.6 tok/s prefill
+  65536     8192         4244       17121     1.05    GPU OUT OF MEMORY
+  81920    10240         5300       20225     1.23    GPU OUT OF MEMORY
+ 131072    16384         8468       29537     1.80    GPU OUT OF MEMORY
+
+The failure is not llama.cpp's cache-full guard and not a -c length check:
+
+  ggml_metal_synchronize: error: command buffer 0 failed with status 5
+  error: Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)
+  ggml_metal_graph_compute: backend is in error state from a previous command
+    buffer failure - recreate the backend to recover
+  llama_decode: failed to decode, ret = -3
+
+That is the Metal driver refusing to execute the command buffer. It fires on the
+FIRST ubatch of the prompt, not after any amount of successful work.
+
+The boundary sits exactly where the arithmetic says it should: the device
+working set crosses the advisory budget between C=49152 (0.86x) and C=65536
+(1.05x). So on this machine stock's maximum WORKABLE context is between 49152
+and 65536 tokens, and it is set by hardware.
+
+FINDING 3 — WHY THE DEVICE COST PER TOKEN IS 193 KiB, NOT 128 KiB
+-------------------------------------------------------------------
+KV is 128 KiB/token (32 layers x 8 KV heads x 128 dim x 2 (K+V) x 2 bytes). But
+the reserved attention scratch also scales with C, at ~65 KiB/token:
+  C=32768 -> 2132 MiB,  C=49152 -> 3188 MiB,  C=65536 -> 4244 MiB,
+  C=131072 -> 8468 MiB   (a clean 64.7 KiB per token of C)
+because with flash attention off the graph materialises the explicit
+n_kv x n_ubatch KQ matrix. Total device cost is therefore ~193 KiB per token of
+context, and the ceiling is
+
+    C_max  ~=  (16383 - 4685) MiB / 193 KiB  ~=  62 000 tokens
+
+which brackets the measured 49152-65536 boundary. Worth stating in the paper:
+the paper's own per-cell KV arithmetic UNDERSTATES the device cost of enlarging
+C by about 50%, because it counts the cache and not the scratch. Since policy 3
+requires flash attention off, this term is unavoidable on the UniKV path -- but
+it is bounded by the resident window C, not by the context length.
+
+FINDING 4 — WHAT UniKV BOUNDS
+-------------------------------
+At matched capability (both able to hold 131072 tokens of context):
+
+  stock  C=131072 : 4685 model + 16384 KV + 8468 scratch = 29537 MiB device
+  UniKV  C=4096   : 4685 model +   512 KV +  284 scratch =  5481 MiB device
+                    + 16384 MiB host spill store
+
+5.4x less device memory, 0.33x of the advisory budget against stock's 1.80x. The
+KV term shrinks 32x and the scratch term 30x, because BOTH are sized by the
+resident window rather than by the context length. Total memory is of course
+still O(N) -- the host tier holds the rest, which the paper already concedes by
+design -- but the DEVICE working set, which is the quantity Metal actually
+enforces, is O(C).
+
+This is the architecture claim P1 asked for, and unlike the -c experiments it is
+not an experimenter's choice: 29537 MiB does not run on this machine and 5481
+MiB does.
+
+FINDING 5 — "WHY NOT SIMPLY ENLARGE THE CACHE?", INSTANTIATED
+---------------------------------------------------------------
+The Discussion gives three arguments and instantiates none. There is now a
+measured answer: enlarging C is free until it isn't, and the cliff is hard.
+Going from C=49152 to C=65536 does not cost throughput -- it costs the ability
+to run at all. There is no graceful degradation, no swap, no slowdown: the
+command buffer is refused and llama_decode returns -3.
+
+DEMONSTRATION (capacity_demo.csv) — a workload above stock's ceiling
+---------------------------------------------------------------------
+Workload: a 65536-token prompt + 32 decoded tokens. That prompt is longer than
+the largest context stock can execute on this machine.
+
+  arm                   C     device MiB  x budget  host MiB  outcome
+  A stock           49152          14017      0.86         0  REJECTED: prompt is
+                                                              too long (65536
+                                                              tokens, max 49148)
+  B stock           73728          18673      1.14         0  GPU OUT OF MEMORY
+                                                              (Metal command
+                                                              buffer refused)
+  C UniKV            4096           5481      0.33      8704  COMPLETED
+
+Arm A is stock's largest WORKABLE context; the prompt does not fit in it. Arm B
+is a context large enough to hold the prompt; it cannot execute. There is no
+third choice: every -c below the ceiling is too small for the workload and every
+-c large enough for the workload is above the ceiling. This is the configuration
+the review asked for -- an overflow caused by hardware, not by the -c flag.
+
+Arm C completed the same workload with a 4096-cell resident window and 61471
+cells in the host tier, at 0.33x the advisory budget. Timings, for honesty:
+prefill 6364 s (65536 tokens at 10.3 tok/s), decode 32 tokens at 1.502 tok/s,
+6387 s total. It completes; it is not fast.
+
+THE COST AT THIS SCALE IS SUPERLINEAR — AND THIS CORRECTS OUR OWN FIT
+----------------------------------------------------------------------
+The controlled recall-cost fit (artifacts/recall_cost/, n_spill <= 8192) is
+  t_step = 32.25 ms + 3.289 us/cell * n_spill
+which predicts 234 ms/step at n_spill = 61471. The measured value here is
+666 ms/step -- the linear form is low by 184%. Since this arm is UNINSTRUMENTED
+(no per-step synchronize()) while the fitted points were instrumented, the gap
+cannot be an instrumentation artifact; it is real superlinearity.
+
+Prefill behaves the same way: extrapolating the measured 16384-token prefill
+(229 s) at the ~N^1.76 growth seen up to 16k predicted ~45 min for 65536 tokens;
+the measured value is 106 min, an exponent nearer 2.4.
+
+Consequence: the linear recall-cost fit is valid inside its fitted range and
+must not be extrapolated to 10^4-10^5 cells. Review item P5 is correct on this
+point, and the paper should say so rather than extrapolate.
+
+WHAT THIS DOES AND DOES NOT SHOW
+---------------------------------
+DOES: on this hardware there exists a real workload that stock cannot run at any
+context setting and UniKV can, with the device working set 2.6x smaller than the
+configuration that fails, and the failure is a driver-level refusal rather than
+a policy choice.
+
+DOES NOT: show that UniKV is a practical way to serve 65k-token contexts on this
+machine. 1.5 tok/s decode and a 106-minute prefill is a demonstration of
+feasibility under a hard capacity bound, not a usable operating point. The paper
+should present it as the former. It also does not show UniKV beating a
+flash-attention-enabled stock baseline, which would have a higher ceiling (see
+LIMITS).
+
+LIMITS
+------
+- One machine, one model, one quantization. The 193 KiB/token figure and the
+  ~62k-token ceiling are specific to Llama-3.1-8B Q4_K_M on a 24 GB M4 Pro with
+  flash attention off and -b/-ub 512. The SHAPE of the argument generalises; the
+  numbers do not.
+- The scratch term depends on ubatch. A smaller ubatch shrinks it and would push
+  the ceiling higher, at a prefill-throughput cost. Not swept here; a reviewer
+  could reasonably ask for that sweep, and "use a smaller ubatch" is a partial
+  counter to Finding 5 that the paper should acknowledge rather than wait to be
+  told.
+  *** ANSWERED 2026-08-11 (F4 Phase A1 sweep, stress_results/f4_a1_ubatch_sweep.csv;
+      see artifacts/f4_phaseA/ubatch_prefill_tradeoff.txt). The capacity gain is
+      real — max workable context 81920 at ub64 vs 49152 at ub512, 1.67x — but
+      the predicted prefill cost IS NOT THERE. At C=49152 prefill runs
+      259.6/259.4/268.2/237.0 tok/s for ub 64/128/256/512: flat over 64-256 and
+      slowest at the LARGEST ubatch. The "at a prefill-throughput cost" clause
+      above was an assumption, not a measurement, and should not be repeated. ***
+- Flash attention ON would remove most of the scratch term and raise stock's
+  ceiling substantially. Policy 3 cannot use flash attention, so the comparison
+  is at -fa off on both sides, which is the honest matched setting but is NOT
+  the best configuration stock can achieve for long contexts. This should be
+  disclosed plainly: a flash-attention stock baseline would reach a higher C
+  than 65536 before hitting the same wall.

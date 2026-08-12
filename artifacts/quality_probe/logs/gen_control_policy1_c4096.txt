@@ -1,0 +1,49 @@
+=== STDOUT ===
+ 48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is
+UNIKV_E2E decode_tokens=32 decode_ms=720.369 tok_per_sec=44.422
+
+
+
+=== STDERR (tail) ===
+ gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3835] span=3836 used=3836 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3836] span=3837 used=3837 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3837] span=3838 used=3838 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3838] span=3839 used=3839 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3839] span=3840 used=3840 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3840] span=3841 used=3841 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3841] span=3842 used=3842 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3842] span=3843 used=3843 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3843] span=3844 used=3844 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3844] span=3845 used=3845 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3845] span=3846 used=3846 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3846] span=3847 used=3847 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3847] span=3848 used=3848 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3848] span=3849 used=3849 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3849] span=3850 used=3850 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3850] span=3851 used=3851 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3851] span=3852 used=3852 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3852] span=3853 used=3853 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3853] span=3854 used=3854 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3854] span=3855 used=3855 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3855] span=3856 used=3856 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3856] span=3857 used=3857 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3857] span=3858 used=3858 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3858] span=3859 used=3859 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3859] span=3860 used=3860 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3860] span=3861 used=3861 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3861] span=3862 used=3862 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3862] span=3863 used=3863 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,3863] span=3864 used=3864 gap=0
+common_perf_print:    sampling time =       2.94 ms
+common_perf_print:    samplers time =       1.83 ms /  3866 tokens
+common_perf_print:        load time =    1168.39 ms
+common_perf_print: prompt eval time =    9580.20 ms /  3834 tokens (    2.50 ms per token,   400.20 tokens per second)
+common_perf_print:        eval time =     716.71 ms /    31 runs   (   23.12 ms per token,    43.25 tokens per second)
+common_perf_print:       total time =   10306.65 ms /  3865 tokens
+common_perf_print: unaccounted time =       6.81 ms /   0.1 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =         29
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 10927 + (5455 =  4685 +     512 +     258) +           0 |
+common_memory_breakdown_print: |   - Host                |                   305 =   281 +       0 +      24                |
+ggml_metal_free: deallocating

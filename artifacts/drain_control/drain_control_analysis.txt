@@ -1,0 +1,135 @@
+alpha=0-with-drain control — separating drain cost from modeled transfer cost
+=============================================================================
+Run 2026-08-04. Harness: scripts/run_drain_control.py
+Data: alpha_results/p3_drain_control_master.csv (15 runs)
+Logs: artifacts/drain_control/logs/gen_<condition>_t<trial>.txt
+Addresses review items M4 and DA-5.
+
+QUESTION
+--------
+Section 4.4 applies llama_context::synchronize() only at alpha>0. Section 5.4
+then reports the resulting alpha=0 offset below the alpha>0 fit as one of "two
+features [that] carry the paper's thesis". The reviewer's objection is
+structural, not numerical: instrumentation that differs across the treatment
+boundary cannot be evidence for a difference at that boundary. How much of the
+published alpha=0 -> alpha=0.25 step is the pipeline drain, and how much is the
+modeled transfer?
+
+METHOD
+------
+A new env var, UNIKV_DRAIN, decouples the drain from alpha:
+  unset -> drain iff alpha > 0   (the published behavior)
+  1     -> drain even at alpha = 0
+  0     -> never drain, even at alpha > 0
+Default behavior is unchanged (verified: with UNIKV_DRAIN unset the condition
+reduces to the original alpha>0 test).
+
+5 conditions x 3 trials = 15 runs, randomized block (seed 20260803), 200 s
+cooldowns, otherwise identical to the cooled alpha sweep: policy 3, C=1024,
+512-token prompt, 2048-token decode, -fa off, greedy, seed 123, and
+UNINSTRUMENTED (UNIKV_LOG unset). The last point is essential: when UNIKV_LOG is
+set the library already synchronizes at both ends of every decode call, which
+would drain both arms and make the control vacuous.
+
+RESULTS
+-------
+  condition      alpha  drain   n   mean tok/s   sd
+  a0_nodrain      0.00   dflt   3        29.76  0.28    published alpha=0 anchor
+  a0_drain        0.00      1   3        29.57  0.12    drain only
+  a025_drain      0.25   dflt   3        29.07  0.04    published alpha=0.25
+  a025_nodrain    0.25      0   3        29.78  0.11    injected delay only
+  a1_nodrain      1.00      0   3        29.22  0.14    alpha=1, no drain
+  All 15 runs decoded the full 2048 tokens, rc=0, flash attention off.
+
+*** SUPERSEDED 2026-08-11 — THE DECOMPOSITION BELOW IS WITHDRAWN ***
+    The 2x2 was closed by a second cooled block (alpha_results/
+    p3_drain_alpha1_master.csv; see artifacts/drain_alpha1/
+    drain_alpha_interaction_analysis.txt). The drain cost is NOT
+    alpha-independent: -0.078 +/- 0.103 at alpha=0 but +0.981 +/- 0.247 at
+    alpha=1, interaction t = 3.96. Two errors below:
+      (a) "the two effects ARE additive" rests on 0.20 + 0.50 = 0.70 against
+          0.69 measured together. That is a telescoping sum — ANY path across a
+          2x2 sums to the corner-to-corner difference. Additivity requires the
+          two paths to agree on each term, and in this block's OWN data they do
+          not: drain costs +0.197 at alpha=0 and +0.713 at alpha=0.25, an
+          interaction of +0.516 +/- 0.190, t = 2.72, present here and not
+          computed at the time.
+      (b) the "29%" drain term (+0.197 +/- 0.177, t = 1.11) was never
+          significant and does not replicate.
+    The RESULTS table, the "delay is invisible without the drain" section and
+    fig7 are unaffected; only the 71/29 split is withdrawn.
+
+DECOMPOSITION (comparing like with like, drain held constant)
+--------------------------------------------------------------
+  published step  alpha=0 (no drain) -> alpha=0.25 (drain):  29.76 -> 29.07
+                                                             = 0.69 tok/s
+
+  drain alone        29.76 -> 29.57  =  0.20 tok/s   (29% of the step)
+  transfer alone,
+  drain held on      29.57 -> 29.07  =  0.50 tok/s   (71% of the step)
+  sum                                =  0.70 tok/s   vs 0.69 measured together
+
+So the two effects ARE additive once the drain is held constant, and roughly
+29% of the published alpha=0 -> alpha=0.25 step is the pipeline drain rather
+than the modeled transfer. (Independent corroboration: the author's own
+alpha_sweep_cooled_analysis.txt attributes ~29% of the fitted slope to drain
+plus nanosleep granularity, from a completely different calculation.)
+
+THE MORE INTERESTING RESULT: THE DELAY IS INVISIBLE WITHOUT THE DRAIN
+----------------------------------------------------------------------
+  alpha=0.25 WITHOUT the drain: 29.78 vs the alpha=0 anchor's 29.76.
+  Indistinguishable — the injected delay costs nothing at all.
+
+At alpha=0.25 with ~1535 cells spilled the injected sleep is ~0.79 ms per
+decode step, against a ~34 ms step. Without a preceding synchronize() the CPU
+sleep overlaps in-flight asynchronous Metal work and is entirely absorbed. This
+is the async-enqueue timing bug of Section 5.1 reproduced deliberately and under
+control: it is the same failure mode, and it is why the drain exists in the
+alpha model at all.
+
+At alpha=1 the sleep (~3.1 ms/step) is large enough to stop being fully
+absorbed: 29.22 vs 29.76 without any drain, a 0.54 tok/s cost. So absorption
+degrades as the injected delay approaches the step time, exactly as an
+overlap argument predicts.
+
+WHAT THIS MEANS FOR THE PAPER'S CLAIM
+--------------------------------------
+The honest statement is narrower than "the discontinuity is the thesis made
+visible", and narrower than the reviewer's "the gap is by construction":
+
+1. The drain is not decoration. Without it the modeled transfer term is
+   unmeasurable at small alpha, because asynchronous execution hides it. Any
+   alpha model injecting a CPU-side delay MUST drain first or it measures
+   nothing. That is a defensible modeling choice, and it should be stated as a
+   choice.
+2. But the drain has its own cost (0.20 tok/s, 0.6%), and it is charged only to
+   the alpha>0 arm. About 29% of the published alpha=0 -> alpha=0.25 step is
+   therefore instrumentation, not modeled transfer.
+3. The remaining 71% is the modeled transfer with the drain held constant, and
+   THAT is the quantity the paper should report as the alpha effect at the
+   boundary.
+4. The alpha>0 REGRESSION SLOPE is unaffected by any of this: every alpha>0
+   point pays the same drain, so the drain is a constant offset within that
+   regression, not a slope term. The slope (-1.197 +/- 0.052 tok/s per unit
+   alpha, t = 23.1, verified independently from
+   p3_alpha_sweep_cooled_master.csv) stands as reported.
+
+Recommended framing: keep the alpha=0 anchor, report the drain-corrected step
+(0.50 of 0.69 tok/s) as the transfer effect at the boundary, disclose the drain
+as a modeling requirement with a measured cost of 0.20 tok/s, and stop
+describing the raw offset as evidence of a physical non-blocking/blocking
+transition. The a025_nodrain arm is the sentence that makes the disclosure
+convincing rather than defensive: it shows what the alternative instrumentation
+would have measured, which is nothing.
+
+LIMITS
+------
+- n=3 per condition; the a0_nodrain arm has sd 0.28 while the others are
+  0.04-0.14, so the 0.20 tok/s drain cost is roughly 1 sd of its noisiest input.
+  It is a small effect measured on a device whose thermal envelope was the whole
+  reason for the cooled protocol. Treat 29% as approximate.
+- Only alpha in {0, 0.25, 1} were tested with the drain manipulated. The drain
+  cost is assumed alpha-independent (it is a fixed synchronize() per spilling
+  step); a1_nodrain is consistent with that but does not prove it, since no
+  a1_drain arm was run in this block (the cooled sweep's alpha=1 = 28.25 is not
+  comparable, being a different block on a different night).

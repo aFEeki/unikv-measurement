@@ -1,0 +1,100 @@
+F4 / A1 — ubatch sweep: how the micro-batch moves the capacity ceiling
+======================================================================
+Run 2026-08-05. Harness: scripts/run_f4_phaseA.py (UNIKV_F4=A1)
+Data: stress_results/f4_a1_ubatch_sweep.csv
+Logs: artifacts/f4_phaseA/logs/gen_A1_ub*_c*.txt
+Maps to: Finding 4 (capacity limits appear at execution; 193 KiB/token).
+
+QUESTION
+--------
+Finding 4's corrected accounting says a context token costs ~193 KiB of device
+memory: 128 KiB of KV plus ~65 KiB of attention scratch. But with flash
+attention off the scratch tensor is n_kv x n_ubatch x n_head, so the 65 KiB term
+is a function of the micro-batch, not a constant of the model. If ubatch moves
+the scratch term it moves the ceiling too, and a paper whose finding IS capacity
+accounting cannot leave the parameter that sets it unswept.
+
+METHOD
+------
+For each ubatch, walk C upward with a 16384-token prompt (long enough that the
+memory is written, which is what Finding 4 shows is necessary) until the Metal
+driver refuses. n_batch fixed at max(512, ubatch) so only ubatch varies.
+Flash attention off throughout, verified per run from its own log: all 15 runs
+report flash_attn = disabled. Binary outcomes, so no cooldowns.
+
+RESULT
+------
+  ubatch   scratch KiB/tok   device KiB/tok   largest C OK   first C refused
+      64              8.29            136.3          81920             98304
+     128             16.57            144.6          81920             98304
+     256             33.16            161.2          65536             81920
+     512             66.37            194.4          49152             65536
+
+The scratch term is exactly linear in ubatch: 8.29 -> 16.57 -> 33.16 -> 66.37
+KiB per context token as ubatch doubles 64 -> 128 -> 256 -> 512. Ratios are
+2.00, 2.00, 2.00. There is no ambiguity about the mechanism.
+
+WHAT THIS DOES TO THE 193 KiB/TOKEN FIGURE
+-------------------------------------------
+It is a ubatch-512 figure, not a device constant. The device cost per context
+token ranges over the swept configurations:
+
+     ubatch 512:  194.4 KiB/token   (the value currently in the draft, confirmed)
+     ubatch 256:  161.2 KiB/token
+     ubatch 128:  144.6 KiB/token
+     ubatch  64:  136.3 KiB/token
+     (asymptote as ubatch -> small: 128 KiB/token, the KV alone)
+
+So the honest statement is: the KV-only calculation understates the device cost
+by between 6% and 52% depending on ubatch, and by 52% at the common default of
+512. The draft's "about 50% sooner than a KV-only calculation predicts" is right
+for ubatch 512 and should be stated as such rather than as a general figure.
+
+AND TO THE CEILING
+-------------------
+The ceiling moves by about 1.7x across the swept range: the largest workable C
+goes from 49152 (ubatch 512) to 81920 (ubatch 64 and 128). Predicted ceilings
+from the measured per-token costs, (16383 - 4685) MiB / (device KiB per token):
+
+     ubatch 512 -> ~62 100    measured bracket (49152, 65536]   consistent
+     ubatch 256 -> ~74 300    measured bracket (65536, 81920]   consistent
+     ubatch 128 -> ~82 800    measured bracket (81920, 98304]   consistent
+     ubatch  64 -> ~87 900    measured bracket (81920, 98304]   consistent
+
+The arithmetic predicts the bracket correctly in every case ONCE the scratch
+term is included, which is the constructive half of Finding 4: the accounting
+works, it just has to count the right things. (Finding 4's other half stands
+unchanged: no amount of arithmetic tells you the buffers will be refused at
+execution rather than at allocation.)
+
+A SECOND-ORDER OBSERVATION WORTH ONE LINE
+------------------------------------------
+The run closest to the wall without crossing it -- ubatch 128 at C=81920,
+0.946x budget -- took 251.8 s against 64-67 s for every other completing run in
+the sweep, a 4x slowdown at the same work. Approaching the advisory budget
+degrades throughput sharply before it fails outright. Between 0.95x and 1.02x
+the behaviour goes slow, then refused. Not investigated further; recorded
+because "the wall is sharp" is slightly too clean a story and this is the
+qualifier.
+
+CONSEQUENCE FOR THE 65536-TOKEN CAPACITY DEMONSTRATION
+-------------------------------------------------------
+At ubatch 64 and 128 the flash-attention-OFF path completes at C=81920, which is
+larger than 65536. The 65536-token prompt therefore fits in an upstream context
+that runs. This is a second, independent reason to doubt Finding 4's "no
+upstream setting runs it" claim -- independent of the flash-attention result in
+A3, and on the non-fused path the draft restricts itself to. A2 tests it
+directly.
+
+LIMITS
+------
+- One model, one quantisation, one device, one prompt length (16384). The
+  scratch coefficient depends on n_head and n_kv layout, so the KiB/token
+  numbers are model-specific; the linearity in ubatch is not.
+- The ceiling is bracketed, not bisected: the sweep steps C in coarse jumps, so
+  each ceiling is known to lie in an interval, not to a token. Bisection would
+  cost a few more runs and was not done because the finding is the SCALING, not
+  a specific token count.
+- Lowering ubatch is not free: it reduces prefill parallelism. This sweep
+  measured capacity, not the throughput cost of buying it, and the paper should
+  not imply small ubatch is a free lunch.

@@ -1,0 +1,94 @@
+*** RATIO CORRECTION 2026-08-07: the 'x budget' figures below were
+    recomputed against 16384 MiB (= 17179.89 MB) after a MB/MiB unit
+    error was found. MiB values and all outcomes are unchanged.
+    See artifacts/CORRECTION_2026-08-07_budget_units.txt ***
+
+F4 / A2 — continuation policies (and small-ubatch upstream) at the 65536-token workload
+=======================================================================================
+Run 2026-08-05. Harness: scripts/run_f4_phaseA.py (UNIKV_F4=A2)
+Data: stress_results/f4_a2_continuation_arms.csv
+Logs: artifacts/f4_phaseA/logs/gen_A2_*.txt
+Maps to: Finding 4 (capacity limits appear at execution).
+
+*** SECOND CONTRADICTION OF THE SAME CLAIM. Combined with A3, Finding 4's
+    "Beyond the ceiling" paragraph needs rewriting, not qualifying. ***
+
+QUESTION
+--------
+Finding 4 asserts, without measuring, that the continuation policies "would also
+complete this workload at a small C by evicting, discarding most of the context
+in the process", and concludes that "what is unavailable at any upstream setting
+is completing it losslessly". Measure the first half. And, prompted by A1's
+finding that ubatch moves the ceiling by 1.7x, test whether a small-ubatch
+upstream configuration can hold the whole prompt on the non-fused path.
+
+RESULT — ALL THREE ARMS COMPLETE
+---------------------------------
+65536-token prompt + 32 decoded tokens, flash attention off on every arm
+(verified per run from its own log), uninstrumented.
+
+  arm                          C      ubatch  device MiB  xbudget  prefill s  decode tok/s
+  rolling window (p1)          4096      512      5481.3    0.335      213.8        27.68
+  H2O (p4)                     4096      512      5737.8    0.350      293.2        31.63
+  stock upstream (p0)         81920       64     15587.8    0.951      614.4         5.86
+
+The first two confirm the asserted claim: both continuation policies complete the
+workload at C=4096, discarding all but 4096 tokens of context, and both are far
+faster than exact retention's 1.50 tok/s.
+
+The third is the one that matters. Stock upstream, flash attention OFF, ubatch
+64, C=81920 COMPLETES the workload -- and because C > 65536, it holds the ENTIRE
+prompt. It is not discarding anything. It is lossless.
+
+WHERE THE 65536-TOKEN WORKLOAD NOW STANDS
+------------------------------------------
+  configuration                        device MiB  decode tok/s  lossless?
+  exact retention, C=4096 + host tier      5481.3          1.50  yes
+  rolling window, C=4096                   5481.3         27.68  no
+  H2O, C=4096                              5737.8         31.63  no
+  upstream fa-off, ubatch 64, C=81920     15587.8          5.86  yes (whole prompt)
+  upstream fa-on,  ubatch 512, C=73728    14159.8         15.99  yes (whole prompt)
+
+Exact retention is the SLOWEST way to complete this workload losslessly. Two
+upstream configurations also complete it losslessly, at 3.9x and 10.7x its decode
+throughput. The claim "no upstream setting runs it" is false on the fused path
+(A3) and false on the non-fused path (here), so it is false as stated under any
+scoping.
+
+WHAT SURVIVES, AND IT IS STILL A REAL RESULT
+---------------------------------------------
+The advantage is device footprint at a given context length, not feasibility:
+
+  exact retention completes the 65536-token workload with a 5481 MiB device
+  working set, 2.8x smaller than the smallest upstream configuration that also
+  completes it losslessly (15588 MiB, fa-off ubatch 64) and 2.6x smaller than
+  the fastest one (14160 MiB, fa-on). It pays 3.9x-10.7x in decode throughput
+  for that.
+
+That is a defensible sentence and it is the one the paragraph should make. It is
+a memory/throughput trade, measured, with the trade stated in both directions. It
+is NOT a feasibility result.
+
+HOW THE FEASIBILITY CLAIM COULD BE RESTORED (not run)
+------------------------------------------------------
+The fused upstream ceiling is the binding one: scratch is constant at 258.5 MiB
+with flash attention on, so upstream tops out near
+(16383 - 4685 - 258) MiB / 128 KiB ~= 91000 tokens. A workload above that -- say
+a 120000-token prompt -- would have no upstream setting on either path, and exact
+retention at C=4096 would in principle still run it.
+
+Not attempted here. Extrapolating the measured spilled-tier prefill scaling
+(~N^2.4: 16384 tokens in 229 s, 65536 in 6364 s) puts a 120000-token prefill near
+7 hours, which is an overnight run and a Phase-B-scale decision rather than a
+Phase A item. It is also worth asking first whether a feasibility claim that
+requires a 7-hour prefill is one the paper wants to make.
+
+LIMITS
+------
+- Single runs per arm; outcomes are binary (completes / refused) and the tok/s
+  figures are single uninstrumented runs quoted as approximate, not block means.
+- The small-ubatch upstream arm buys its capacity with prefill parallelism:
+  614 s against 494 s for the fa-on arm at a larger ubatch. Lower ubatch is a
+  real lever on the ceiling and a real cost, and neither should be reported
+  without the other.
+- One device, one model, one quantisation.

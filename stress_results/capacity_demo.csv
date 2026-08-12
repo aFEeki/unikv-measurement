@@ -1,0 +1,4 @@
+arm,role,ctx,policy,spill_cap,prompt_tokens,rc,timed_out,outcome,gpu_oom_lines,prompt_rejected,flash_attn,kv_device_mib,model_device_mib,compute_device_mib,device_total_mib,metal_budget_mib,device_over_budget,host_store_mib,prefill_ms,decode_tokens,decode_tok_per_sec,duration_s
+A_stock_c49152,stock at its largest workable C,49152,0,,65536,1,False,REJECTED: prompt longer than the context,0,True,disabled,6144.0,4685.3,3188.01,14017.3,17179.89,0.816,,,,,1.1
+B_stock_c73728,stock at a C large enough to hold the prompt,73728,0,,65536,1,False,GPU OUT OF MEMORY (Metal command buffer refused),8,False,disabled,9216.0,4685.3,4772.01,18673.3,17179.89,1.087,,,,,1.1
+C_unikv_c4096,"UniKV, bounded device window + host tier",4096,3,69632,65536,0,False,COMPLETED,0,False,disabled,512.0,4685.3,284.01,5481.3,17179.89,0.319,8704.0,6364287.83,32,1.502,6387.0

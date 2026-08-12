@@ -1,0 +1,43 @@
+Run 2 — recall-cost alpha model, spot-check (C=1024, 512-prompt + 2048 decode,
+-fa off, seed 123, policy 3). Report to judgment BEFORE the full sweep.
+
+MODEL (as instructed): alpha prices the per-step RECALL, not the spill event.
+Per decode() call, delay = alpha * (n_spilled_cells * per_cell_KV_bytes) / 64e9,
+injected at the decode return path with synchronize() before nanosleep (drain
+GPU first, else async Metal hides the sleep — the old timing bug). per_cell_bytes
+= kv_total_bytes / kv_size = 128 KiB here; n_spilled ramps 0 -> ~1535 over the run.
+
+RESULTS
+  alpha=0 : 28.661 tok/s   (decode_ms 71457)
+  alpha=1 : 26.009 tok/s   (decode_ms 78742)
+  alpha=2 : 23.077 tok/s   (decode_ms 88746)
+
+GATES
+  [PASS] alpha=0 reproduces plain policy-3: Run-1 plain p3@1024 = 28.449 tok/s;
+         alpha=0 here = 28.661 (0.7%, thermal). The injection block is skipped
+         entirely when alpha==0, so this is the identical code path (already
+         token-identical in the 4-arm gate).
+  [PASS] alpha>0 degrades monotonically in the right direction: 28.66 -> 26.01
+         -> 23.08.
+  [PASS] all < 58 tok/s ceiling.
+
+TWO THINGS FOR JUDGMENT'S MODEL DECISION (before the full sweep):
+
+1. Per-step synchronize() only fires at alpha>0. At alpha=0 the whole block is
+   skipped, so there is no per-step drain and the GPU/CPU pipeline overlaps
+   naturally (fastest). At any alpha>0, the required drain serializes each step.
+   This can put the alpha=0 point slightly OFF the line the alpha>0 points form
+   (a possible discontinuity at 0). Physically defensible (a real PCIe recall is
+   a blocking dependency that breaks overlap; unified memory has no such stall),
+   but it is a framing choice: fit the line on alpha>0 and show alpha=0 as the
+   "unified-memory / no modeled transfer" reference, OR redefine the gate to sync
+   every step including alpha=0. I did NOT change the injection — this is yours.
+
+2. This 3-point spot-check is sequential and unrandomized, so thermal drift
+   contaminates the SPACING (alpha=2 ran last/hottest; the alpha1->2 step (4.9
+   ms/tok) is larger than alpha0->1 (3.6 ms/tok), consistent with heat, not a
+   real super-linearity). The full 5-trial randomized-block sweep will give clean
+   spacing — same treatment the original alpha sweep got.
+
+RECOMMENDATION: model is sane; proceed to the full randomized-block sweep on your
+go. Awaiting confirmation (and your call on point 1) before running it.

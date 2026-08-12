@@ -1,0 +1,170 @@
+*** SUPERSEDED 2026-08-07 for gamma/delta by B2 Block 1
+    (stress_results/b2_isochronal_both_modes.csv,
+     artifacts/b2_cooled/B2_analysis.txt).
+    B2 re-measured this curve on a quiet machine in BOTH tier modes:
+      CPU-pinned      31.563 ms + 3.0990 us/cell, gamma 9.009 ms
+      device-visible  25.423 ms + 2.1531 us/cell, gamma 2.879 ms
+    The CPU-pinned figures here (32.25 ms + 3.289 us/cell, gamma ~9.0) reproduce
+    to within noise, but quote B2's.
+    STILL VALID and NOT superseded by B2: the superlinearity result beyond the
+    fitted range (666 ms/step measured at n_spill = 61471, 184% above the linear
+    prediction) and the prefill-cost scaling. B2 did not re-measure either. ***
+
+Recall cost vs spilled-set size — summary
+=========================================
+Run 2026-08-04. Addresses review items M7 ("the recall cost is characterized by
+two points"), P5 ("measure out to 10^4 or drop the agentic motivation"), and
+feeds the compute-cost term D3/C1 asks for in the cost model.
+Numeric detail: artifacts/recall_cost/recall_cost_analysis.txt
+Data: stress_results/recall_cost_isochronal.csv        (controlled, PRIMARY)
+      stress_results/recall_cost_steps_A_p3_long.csv   (single long run)
+      stress_results/recall_cost_steps_B_p1_ctrl.csv   (thermal control)
+      stress_results/recall_cost_e2e.csv               (uninstrumented e2e)
+Figure: figures/fig5_recall_cost.pdf/.png
+
+QUESTION
+--------
+The paper supports "the recurring recall cost grows with the spilled set" with
+two points (33.0 tok/s at 511 cells, 28.5 at 1535). What is the actual shape,
+and does it survive extrapolation to the 10^4-10^5-token contexts the
+discussion invokes?
+
+THE MEASUREMENT TRAP (and why there are three datasets)
+-------------------------------------------------------
+The obvious experiment — one long decode run, plot ms/step against n_spill —
+does not work on this device. n_spill grows monotonically with elapsed time, and
+this machine droops ~21% over ~250 s, so n_spill and temperature are the same
+variable and no within-run regression can separate them.
+
+  (1) Single long run (A): C=1024, 512-token prompt, 10752-token decode budget,
+      reaching n_spill = 10239. Per-step cost rises 33 -> 83 ms. Raw slope
+      5.32 us/cell.
+  (2) Thermal control (B): policy 1, same C and budget, constant work per step
+      (window pinned at 1024, nothing spilled). Its droop is +6.0 ms/step over
+      303 s (+21.3%), confirming the magnitude. Subtracting it linearly gives
+      4.18 us/cell — but its droop SATURATES around 240 s while run A lasts
+      610 s, and it is a GPU-only workload while policy 3 is CPU-heavy, so this
+      correction is an approximation and under-corrects.
+  (3) Controlled / isochronal (PRIMARY): the spilled tier is established during
+      PREFILL to a target size, then a short decode burst is timed. n_spill is
+      fixed before the burst instead of growing through it. Randomized-block
+      order, cooldowns between runs.
+
+RESULT (controlled measurement, C=1024, flash attention off)
+------------------------------------------------------------
+  n_spill   trials   ms/step    sd     tok/s
+        0        2     23.22   0.11    43.07     policy 3, nothing spilled
+      512        2     34.29   0.30    29.16
+     1024        2     35.78   0.14    27.95
+     2048        2     38.36   0.15    26.07
+     4096        5     50.92   7.05    19.64     (see LIMITS)
+     8192        2     59.31   0.47    16.86
+
+  fit over the spilling points, excluding n=4096:
+      t_step = 32.25 ms + 3.289 us/cell * n_spill   (+/- 0.086, resid sd 0.53 ms)
+  including n=4096:
+      t_step = 32.90 ms + 3.412 us/cell * n_spill   (+/- 0.429, resid sd 2.68 ms)
+
+THE SHAPE, AND WHY IT MATTERS
+------------------------------
+The cost is NOT dominated by the size of the spilled set over the measured
+range. It splits into two very different terms:
+
+  fixed:     entering the two-tier path at all costs ~9.0 ms/step
+             (23.22 -> 32.25 ms), paid as soon as ONE cell has spilled
+  marginal:  ~3.3 us per spilled cell thereafter
+
+The marginal term does not equal the fixed term until n_spill ~ 2750 cells. So
+at C=1024 with a few hundred cells spilled, essentially the entire recall cost
+is a per-step constant of THIS IMPLEMENTATION — the CPU-pinned spilled matmuls,
+their graph nodes, and the concat plus single softmax over the union — and
+almost none of it is the retained data being large.
+
+That is a direct, measured handle on review item P2 (the throughput cost is
+plausibly an artifact of pinning the spilled tier to the CPU backend rather
+than of the policy): most of the cost at realistic spill sizes is a fixed
+per-step penalty for leaving the GPU path, not a per-byte cost of the retained
+tier. It also means the compute term D3 wants in Eq. (2) should be affine, not
+linear-through-the-origin: a per-step activation cost plus a small per-entry
+cost, which is a strictly stronger (and more testable) statement than "cost
+grows with the spilled set".
+
+EXTRAPOLATION (P5) — THE LINEAR FIT DOES NOT EXTRAPOLATE. P5 WAS RIGHT.
+------------------------------------------------------------------------
+An earlier draft of this file extrapolated the linear fit to 10^5 cells and
+called the 10^4 extrapolation "interpolation-adjacent". The capacity
+demonstration (artifacts/capacity_probe/, run afterwards) measured a point at
+n_spill = 61471 and falsified that:
+
+  n_spill    linear fit      MEASURED        fit error
+     1535    37.3 ms/step    --              (inside the fitted range)
+     4096    45.7 ms/step    50.9 ms/step    fit low by 10%
+     8192    59.2 ms/step    59.3 ms/step    exact (fitted point)
+    10240    65.9 ms/step    81-83 ms/step   fit low by ~25% (long run,
+                                             heat-soaked, so an upper bound)
+    61471   234.4 ms/step    666 ms/step     fit low by 184%
+   100000   361.2 ms/step    --              would be badly wrong
+
+The 61471-cell point comes from the capacity demo's UniKV arm (65536-token
+prompt, C=4096, UNINSTRUMENTED, so it carries LESS overhead than the
+instrumented controlled points and the gap cannot be an instrumentation
+artifact). Decode there ran at 1.502 tok/s.
+
+Fitting a power law through the two ends of the measured range (8192 -> 61471,
+59.3 -> 666 ms) gives an exponent of ~1.20: the per-step cost grows somewhat
+FASTER than the size of the spilled set. On that form n_spill = 10^5 lands near
+1200 ms/step (~0.8 tok/s), not the 361 ms/step the linear fit predicts.
+
+Honest statement for the paper: the cost is affine and well-behaved WITHIN the
+range where the fit was measured (n_spill <= ~8k), and superlinear beyond it. Do
+not extrapolate the linear form past ~10^4. Where a 10^4-10^5 number is needed,
+quote the measured 61471-cell point (1.5 tok/s) and say plainly that the trend
+steepens. This is exactly P5's objection, and the answer is that the agentic
+motivation does NOT survive linear extrapolation — it survives only as "the
+policy still completes, at single-digit tokens per second".
+
+E2E CROSS-CHECK (uninstrumented wall clock, randomized block, n=2 each)
+-----------------------------------------------------------------------
+  final n_spill   mean tok/s   sd
+           1024        31.53  0.07
+           2560        26.85  0.30
+           5632        20.85  0.62
+An e2e run averages over n_spill = 0..final, so these necessarily sit above the
+per-step cost at their final n_spill; they test the shape, not the level. Run
+A's own prefixes reproduce the two shorter ones to within 2% (31.77 vs 31.53 at
+1536 tokens; 27.30 vs 26.85 at 3072).
+
+BONUS: PREFILL COST WHEN THE TIER IS BUILT DURING INGESTION
+------------------------------------------------------------
+  prompt   512 tok :   1.19 s (430 tok/s)      prompt  3072 tok : 13.06 s (235 tok/s)
+  prompt  1536 tok :   4.53 s (339 tok/s)      prompt  5120 tok : 29.42 s (174 tok/s)
+  prompt  2048 tok :   7.03 s (291 tok/s)      prompt  9216 tok : 83.41 s (110 tok/s)
+Growth is ~quadratic: every ubatch attends over the whole spilled tier, on the
+CPU. This is what sizes any long-context experiment on this build — a 65k-token
+prompt extrapolates to roughly an hour of prefill.
+
+ALSO OBSERVED: A ONE-OFF GRAPH-REALLOCATION STEP
+-------------------------------------------------
+The first decode step after a batched prefill costs ~8 s at n_spill=8192 (vs a
+~68 ms steady state), scaling with the spilled-tier size (~1.2 s at n_spill=0,
+~4.7 s at 4096). It is the ggml graph being rebuilt when the ubatch shape drops
+from 512 to 1 with a large spilled tier attached. Recorded per run in the
+`transient_ms` column and EXCLUDED from the per-step figures above (the first 32
+burst steps are dropped). It is a real user-visible latency at the
+prompt-to-generation boundary and worth a sentence in the paper, but it is not
+part of the steady-state recall cost.
+
+LIMITS
+------
+- n=2 per controlled point (n=5 at 4096). Every point repeats to under 0.5 ms
+  EXCEPT n=4096, whose 5 trials spread 44.0-60.9 ms (sd 7.0). Unexplained; not
+  trimmed. The fit is reported with and without it and the slope moves 3.29 ->
+  3.41 us/cell, so the conclusion does not turn on it.
+- The controlled design still self-heats: a larger target needs a longer prefill
+  immediately before the burst (83 s at n_spill=8192). Larger points are
+  therefore measured warmer than smaller ones, which if anything inflates the
+  slope — so 3.3 us/cell is an upper bound on the cool-device marginal cost.
+- One model, one quantization, one C. The fixed/marginal split is specific to
+  this CPU-pinned two-tier implementation; a GPU-side spilled tier (P2) would be
+  expected to change the fixed term drastically and is the experiment that would
+  settle whether the ~9 ms is inherent or incidental.

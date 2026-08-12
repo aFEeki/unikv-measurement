@@ -1,0 +1,89 @@
+RECALL COST vs SPILLED-SET SIZE
+========================================================================
+policy-3 run : recall_cost_steps_A_p3_long.csv  (10751 decode steps)
+control run  : recall_cost_steps_B_p1_ctrl.csv  (10751 decode steps)
+NB the per-call CSV's `ttft_ms` column holds the per-decode-call wall
+clock (llama_context::decode is bracketed by synchronize() on both ends
+when UNIKV_LOG is set), not a time-to-first-token; the header name is a
+legacy misnomer. Step 1 (prefill) is excluded throughout.
+
+-- raw per-step cost --
+  pre-spill  (n_spill=0) :    512 steps, mean   23.52 ms (resident window filling, GPU-only path)
+  spilling   (n_spill>0) :  10239 steps, n_spill 1..10239
+
+  n_spill bin        steps   mean ms   tok/s
+  [     1,   256)      255     33.14   30.17
+  [   256,   512)      256     34.63   28.88
+  [   512,  1024)      512     37.00   27.02
+  [  1024,  2048)     1024     40.95   24.42
+  [  2048,  4096)     2048     46.22   21.64
+  [  4096,  6144)     2048     55.32   18.08
+  [  6144,  8192)     2048     69.43   14.40
+  [  8192, 10240)     2048     81.13   12.33
+
+-- raw fit over spilling steps:  t_step = a + b * n_spill --
+  a =   30.850 ms      (two-tier step with an empty spilled tier)
+  b =   5.3152 us/cell  (+/- 0.0111, residual sd 3.32 ms)
+  fixed cost of entering the two-tier path: 7.33 ms/step (vs the GPU-only pre-spill steps; part of this is the larger resident window, see the control below)
+
+-- thermal control (policy 1, constant work per step) --
+  mean 28.20 ms/step, kv_used pinned at 1024
+  drift = +19.8166 us per step per second of elapsed time (+/- 0.1218)
+  over the 303 s control run that is +6.01 ms/step end to end (+21.3%)
+
+-- drift-corrected fit (control's drift-per-second removed) --
+  a =   31.472 ms
+  b =   4.1762 us/cell  (+/- 0.0106, residual sd 3.18 ms)
+  thermal droop accounts for 21.4% of the raw slope
+
+-- CONTROLLED measurement (isochronal): spilled set fixed by prefill,
+   short decode burst timed, randomized block with cooldowns --
+   This is the fit to quote: n_spill is set before the burst instead of
+   growing through it, so it is not aliased with elapsed time.
+    n_spill  n   ms/step     sd   tok/s
+          0  2     23.22   0.11   43.07
+        512  2     34.29   0.30   29.16
+       1024  2     35.78   0.14   27.95
+       2048  2     38.36   0.15   26.07
+       4096  5     50.92   7.05   19.64
+       8192  2     59.31   0.47   16.86
+
+   fit, all points      : 32.90 ms + 3.412 us/cell (+/- 0.429, resid sd 2.68 ms)
+   fit, excl. n=4096    : 32.25 ms + 3.289 us/cell (+/- 0.086, resid sd 0.53 ms)
+   (n=4096 is the one irreproducible point: 5 trials spread
+    44.0-60.9 ms where every other point repeats to <0.5 ms.)
+   policy-3 no-spill reference: 23.22 ms/step
+   fixed cost of entering the two-tier path: 9.04 ms/step
+   marginal term equals the fixed term at n_spill = 2747 cells
+   vs the single-run raw slope (5.32 us/cell): heating inflated
+   the uncontrolled slope by ~38%.
+
+-- prefill cost when the tier is built during prompt ingestion --
+   (bonus from the same runs; sizes any long-context experiment)
+   prompt    512 tok :    1.19 s ( 430.4 tok/s)
+   prompt   1536 tok :    4.53 s ( 339.2 tok/s)
+   prompt   2048 tok :    7.03 s ( 291.2 tok/s)
+   prompt   3072 tok :   13.06 s ( 235.2 tok/s)
+   prompt   5120 tok :   29.42 s ( 174.0 tok/s)
+   prompt   9216 tok :   83.41 s ( 110.5 tok/s)
+   Growth is ~quadratic in prompt length: every ubatch attends over
+   the whole spilled tier, on the CPU.
+
+-- what the fit implies (controlled fit where available) --
+  n_spill =    1535 ->     37.30 ms/step =  26.81 tok/s  [measured range]
+  n_spill =    4096 ->     45.73 ms/step =  21.87 tok/s  [measured range]
+  n_spill =   10240 ->     65.93 ms/step =  15.17 tok/s  [extrapolated]
+  n_spill =  100000 ->    361.16 ms/step =   2.77 tok/s  [extrapolated]
+  the marginal term equals the WHOLE two-tier intercept (GPU base +
+  two-tier entry) at n_spill = 9806 cells; it equals the two-tier
+  ENTRY cost alone much earlier -- see the controlled section above.
+
+-- e2e cross-check (uninstrumented wall clock, randomized block) --
+  n_spill_final  n mean tok/s     sd
+           1024  2      31.53   0.07
+           2560  2      26.85   0.30
+           5632  2      20.85   0.62
+  (an e2e run averages over n_spill = 0..final, so these sit above the
+   per-step cost at their final n_spill by construction -- they test the
+   shape, not the level.)
+

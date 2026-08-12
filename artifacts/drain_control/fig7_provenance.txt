@@ -1,0 +1,97 @@
+Figure 7 (Finding 3) — provenance decision and what is drawn
+============================================================
+2026-08-07. Generator: scripts/make_fig7_drain.py
+Source: alpha_results/p3_drain_control_master.csv (5 conditions x 3 trials)
+Output: figures/fig7_drain.{pdf,png}, copied to paper/UNIKV-MEASUREMENT/
+No new runs.
+
+DECISION: DRAIN-CONTROL BLOCK ALONE. NOT SPLICED WITH THE COOLED SWEEP.
+------------------------------------------------------------------------
+The overlay was genuinely on the table. The two blocks share an alpha=0
+undrained point and agree to 0.30% (sweep 29.673, drain control 29.762), and
+they also agree to 0.41% at alpha=0.25 drained (29.187 vs 29.068). On level,
+they are interchangeable.
+
+They are NOT interchangeable on slope, which is what this figure claims:
+
+    drained slope, drain-control block   -1.991 +/- 0.300 tok/s per unit alpha
+                                         (2 points, alpha 0 -> 0.25)
+    drained slope, cooled sweep          -1.197 +/- 0.052 tok/s per unit alpha
+                                         (n=18 fit, alpha 0.25 -> 2)
+    difference                           -0.794, t = -2.61
+
+Two points settle it:
+
+1. A shared level anchor calibrates LEVEL. This figure's entire claim is that
+   two series differ in SLOPE, and the one cross-block slope comparison
+   available disagrees at t = 2.6. Splicing would assert exactly the property
+   the data declines to support.
+
+2. The spliced drained series would carry a visible kink at alpha=0.25 — steep
+   from the drain-control segment, shallower from the sweep — that no reader
+   could attribute to curvature rather than to the block change. Producing an
+   unattributable feature is worse than producing a shorter series.
+
+(Whether that -1.99 vs -1.20 difference is real curvature in the first quarter
+of alpha or a block effect is not resolvable from these data. It is a fair thing
+for a future block to settle, by running drained points beyond alpha=0.25 in the
+same block as the undrained ones.)
+
+The within-block statistic is in any case the stronger one. At alpha=0.25, the
+only alpha where both conditions were measured:
+
+    undrained 29.781 - drained 29.068 = +0.713 +/- 0.068 tok/s,  t = 10.5
+
+That single contrast carries the finding, and it needs no second block.
+
+WHAT THE FIGURE DRAWS
+---------------------
+  undrained  alpha 0.00  29.762 +/- 0.281
+             alpha 0.25  29.781 +/- 0.110
+             alpha 1.00  29.221 +/- 0.145
+  drained    alpha 0.00  29.566 +/- 0.123
+             alpha 0.25  29.068 +/- 0.042
+
+Error bars are the per-condition SDs, as specified. The vertical arrow at
+alpha=0.25 marks the 0.713 tok/s gap with its t statistic. Slopes are given in
+the legend rather than beside the lines, so "-1.99" cannot be misread as a data
+value. A note marks that the drained series stops at alpha=0.25 because that is
+where the block's data stops — the series is not extrapolated.
+
+ONE CORRECTION TO HOW THIS RESULT HAS BEEN DESCRIBED
+-----------------------------------------------------
+The undrained series is NOT flat, and the figure does not draw it as flat.
+
+    undrained, alpha 0 -> 0.25:  +0.019 +/- 0.174  (t =  0.11)  invisible
+    undrained, alpha 0 -> 1:     -0.541 +/- 0.183  (t = -2.96)  real
+
+Over the full range the undrained arm loses 1.8% of throughput, and that decline
+is statistically real. What the block shows is that it is much SHALLOWER than
+the drained arm: -0.588 against -1.991 tok/s per unit alpha, a factor of 3.4.
+
+So the claim the figure supports is "an injected delay is largely absorbed
+unless the pipeline is drained", not "an injected delay is invisible unless the
+pipeline is drained". At alpha=0.25 the delay is genuinely invisible (t = 0.11);
+by alpha=1, with the sleep at roughly 3.1 ms against a ~34 ms step, absorption
+is no longer complete. That is the physically expected behaviour — overlap
+degrades as the injected delay approaches the step time — and it is worth one
+clause in the caption rather than being smoothed over.
+
+AXIS
+----
+y is truncated to 28.85-30.28 and the truncation is marked with a break glyph on
+the axis. Justification, per the standing convention that fig5 keeps a zero
+baseline: fig5's caption quotes percentage reductions, so a truncated axis there
+would visually overstate them. This figure claims a difference in SLOPE, not the
+size of a ratio, and the entire effect spans 0.7 tok/s out of ~29.5 — on a zero
+baseline it would be invisible. Truncation is the right call here and the wrong
+call there.
+
+ASSERTIONS
+----------
+The generator dies, naming the CSV, unless: flash attention is off on all 15
+runs, all rc=0, all decoded 2048 tokens, each condition has exactly 3 trials,
+every plotted mean and SD matches to 0.0015, each condition's recorded alpha
+matches the x position it is plotted at, each condition's recorded drain setting
+matches the series it is assigned to, and the alpha=0.25 gap recomputes to the
+locked 0.713.

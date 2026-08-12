@@ -1,0 +1,72 @@
+=== STDOUT (generated) ===
+ 48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is
+UNIKV_E2E decode_tokens=32 decode_ms=744.530 tok_per_sec=42.980
+
+
+
+=== STDERR (tail) ===
+load_tensors: offloading 31 repeating layers to GPU
+load_tensors: offloaded 33/33 layers to GPU
+load_tensors:   CPU_Mapped model buffer size =   281.81 MiB
+load_tensors:  MTL0_Mapped model buffer size =  4685.30 MiB
+........................................................................................
+common_init_result: added <|end_of_text|> logit bias = -inf
+common_init_result: added <|eom_id|> logit bias = -inf
+common_init_result: added <|eot_id|> logit bias = -inf
+llama_context: constructing llama_context
+llama_context: n_seq_max     = 1
+llama_context: n_ctx         = 4096
+llama_context: n_ctx_seq     = 4096
+llama_context: n_batch       = 2048
+llama_context: n_ubatch      = 512
+llama_context: causal_attn   = 1
+llama_context: flash_attn    = enabled
+llama_context: kv_unified    = false
+llama_context: freq_base     = 500000.0
+llama_context: freq_scale    = 1
+llama_context: n_ctx_seq (4096) < n_ctx_train (131072) -- the full capacity of the model will not be utilized
+ggml_metal_init: allocating
+ggml_metal_init: found device: Apple M4 Pro
+ggml_metal_init: picking default device: Apple M4 Pro
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+llama_context:        CPU  output buffer size =     0.49 MiB
+llama_kv_cache:       MTL0 KV buffer size =   512.00 MiB
+llama_kv_cache: size =  512.00 MiB (  4096 cells,  32 layers,  1/1 seqs), K (f16):  256.00 MiB, V (f16):  256.00 MiB
+llama_kv_cache: attn_rot_k = 0, n_embd_head_k_all = 128
+llama_kv_cache: attn_rot_v = 0, n_embd_head_k_all = 128
+sched_reserve: reserving ...
+sched_reserve: resolving fused Gated Delta Net support:
+sched_reserve: fused Gated Delta Net (autoregressive) enabled
+sched_reserve: fused Gated Delta Net (chunked) enabled
+sched_reserve:       MTL0 compute buffer size =   258.50 MiB
+sched_reserve:        CPU compute buffer size =    24.01 MiB
+sched_reserve: graph nodes  = 999
+sched_reserve: graph splits = 2
+sched_reserve: reserve took 7.10 ms, sched copies = 1
+main: llama threadpool init, n_threads = 10
+
+system_info: n_threads = 10 (n_threads_batch = 10) / 14 | MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | MATMUL_INT8 = 1 | DOTPROD = 1 | SME = 1 | ACCELERATE = 1 | REPACK = 1 | 
+
+sampler seed: 123
+sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = -1
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+generate: n_ctx = 4096, n_batch = 2048, n_predict = 32, n_keep = 1
+
+common_perf_print:    sampling time =       2.47 ms
+common_perf_print:    samplers time =       1.56 ms /  3866 tokens
+common_perf_print:        load time =    4830.09 ms
+common_perf_print: prompt eval time =    9295.90 ms /  3834 tokens (    2.42 ms per token,   412.44 tokens per second)
+common_perf_print:        eval time =     741.13 ms /    31 runs   (   23.91 ms per token,    41.83 tokens per second)
+common_perf_print:       total time =   10042.13 ms /  3865 tokens
+common_perf_print: unaccounted time =       2.63 ms /   0.0 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =         29
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 10927 + (5455 =  4685 +     512 +     258) +           0 |
+common_memory_breakdown_print: |   - Host                |                   305 =   281 +       0 +      24                |
+ggml_metal_free: deallocating

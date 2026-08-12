@@ -1,0 +1,196 @@
+=== STDOUT ===
+ token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token token
+UNIKV_E2E decode_tokens=128 decode_ms=4341.690 tok_per_sec=29.482
+
+
+
+=== STDERR ===
+added <|eom_id|> logit bias = -inf
+common_init_result: added <|eot_id|> logit bias = -inf
+llama_context: constructing llama_context
+llama_context: n_seq_max     = 1
+llama_context: n_ctx         = 1024
+llama_context: n_ctx_seq     = 1024
+llama_context: n_batch       = 512
+llama_context: n_ubatch      = 512
+llama_context: causal_attn   = 1
+llama_context: flash_attn    = disabled
+llama_context: kv_unified    = false
+llama_context: freq_base     = 500000.0
+llama_context: freq_scale    = 1
+llama_context: n_ctx_seq (1024) < n_ctx_train (131072) -- the full capacity of the model will not be utilized
+ggml_metal_init: allocating
+ggml_metal_init: found device: Apple M4 Pro
+ggml_metal_init: picking default device: Apple M4 Pro
+ggml_metal_init: use fusion         = true
+ggml_metal_init: use concurrency    = true
+ggml_metal_init: use graph optimize = true
+llama_context:        CPU  output buffer size =     0.49 MiB
+llama_kv_cache:       MTL0 KV buffer size =   128.00 MiB
+llama_kv_cache: size =  128.00 MiB (  1024 cells,  32 layers,  1/1 seqs), K (f16):   64.00 MiB, V (f16):   64.00 MiB
+llama_kv_cache: attn_rot_k = 0, n_embd_head_k_all = 128
+llama_kv_cache: attn_rot_v = 0, n_embd_head_k_all = 128
+init: unikv: host spill store =  512.00 MiB (4096 cells, 32 layers)
+sched_reserve: reserving ...
+sched_reserve: resolving fused Gated Delta Net support:
+sched_reserve: fused Gated Delta Net (autoregressive) enabled
+sched_reserve: fused Gated Delta Net (chunked) enabled
+sched_reserve:       MTL0 compute buffer size =   258.50 MiB
+sched_reserve:        CPU compute buffer size =    22.01 MiB
+sched_reserve: graph nodes  = 1158
+sched_reserve: graph splits = 2
+sched_reserve: reserve took 7.51 ms, sched copies = 1
+main: llama threadpool init, n_threads = 10
+
+system_info: n_threads = 10 (n_threads_batch = 10) / 14 | MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | MATMUL_INT8 = 1 | DOTPROD = 1 | SME = 1 | ACCELERATE = 1 | REPACK = 1 | 
+
+sampler seed: 123
+sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = -1
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+generate: n_ctx = 1024, n_batch = 512, n_predict = 128, n_keep = 1
+
+decode: unikv: spilled 512 cells (64.00 MiB) to host; retained=512
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=513
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=514
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=515
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=516
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=517
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=518
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=519
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=520
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=521
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=522
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=523
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=524
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=525
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=526
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=527
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=528
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=529
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=530
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=531
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=532
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=533
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=534
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=535
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=536
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=537
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=538
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=539
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=540
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=541
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=542
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=543
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=544
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=545
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=546
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=547
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=548
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=549
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=550
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=551
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=552
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=553
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=554
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=555
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=556
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=557
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=558
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=559
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=560
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=561
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=562
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=563
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=564
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=565
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=566
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=567
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=568
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=569
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=570
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=571
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=572
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=573
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=574
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=575
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=576
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=577
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=578
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=579
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=580
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=581
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=582
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=583
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=584
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=585
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=586
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=587
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=588
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=589
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=590
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=591
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=592
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=593
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=594
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=595
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=596
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=597
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=598
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=599
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=600
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=601
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=602
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=603
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=604
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=605
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=606
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=607
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=608
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=609
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=610
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=611
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=612
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=613
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=614
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=615
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=616
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=617
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=618
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=619
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=620
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=621
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=622
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=623
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=624
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=625
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=626
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=627
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=628
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=629
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=630
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=631
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=632
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=633
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=634
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=635
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=636
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=637
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=638
+decode: unikv: spilled 1 cells (0.12 MiB) to host; retained=639
+common_perf_print:    sampling time =       8.41 ms
+common_perf_print:    samplers time =       5.27 ms /  1664 tokens
+common_perf_print:        load time =    1170.22 ms
+common_perf_print: prompt eval time =    4500.01 ms /  1536 tokens (    2.93 ms per token,   341.33 tokens per second)
+common_perf_print:        eval time =    4328.43 ms /   127 runs   (   34.08 ms per token,    29.34 tokens per second)
+common_perf_print:       total time =    8843.24 ms /  1663 tokens
+common_perf_print: unaccounted time =       6.39 ms /   0.1 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =        126
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 11311 + (5071 =  4685 +     128 +     258) +           0 |
+common_memory_breakdown_print: |   - Host                |                   496 =   281 +       0 +     215                |
+~llama_context:        CPU compute buffer size of 215.0078 MiB, does not match expectation of  22.0098 MiB
+ggml_metal_free: deallocating

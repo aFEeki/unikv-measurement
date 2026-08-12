@@ -1,0 +1,33 @@
+Run 3 — policy-3 idle no-overhead reference @ C=4096 (2048 decode, -fa off, seed 123)
+=================================================================================
+
+QUESTION: what is the per-token overhead of policy 3 when nothing spills
+(spill_events == 0 confirmed for every p3 arm at C=4096)?
+
+MECHANISM (ground truth): when unikv_spill->active() is false, build_attn takes
+the SAME branch as baseline (stock build_attn_mha) — byte-identical attention
+graph. The only policy-3 costs at idle are (a) a one-time host store allocation
+at context construction (not per-token) and (b) a per-decode bool read
+(active()). So the expected per-token overhead is ~0 by construction.
+
+EMPIRICAL (thermal-dominated, NOT resolvable):
+  forward single pair  (p0 1st, p3 2nd): p0 38.703  p3 36.946  -> p3 4.54% slower
+  reversed single pair (p3 1st, p0 2nd): p3 39.932  p0 39.753  -> p3 0.45% faster
+  => the sign of the "overhead" flips with run ORDER. It is a position/thermal
+     artifact, not a policy effect.
+
+  position-balanced interleaved block (order 0 3 3 0 0 3 3 0):
+    p0 (pos 1,4,5,8): 39.862 31.647 34.225 35.164  mean 35.22  std 2.97
+    p3 (pos 2,3,6,7): 39.477 37.948 35.247 35.138  mean 36.95  std 1.84
+    mean diff (p0-p3) = -1.73 tok/s (p3 nominally 4.9% FASTER — nonsensical for
+      an "overhead"; p0 simply landed in the thermal trough at positions 4,5).
+    thermal swing across the 8 runs: 39.9 -> 31.6 = 8.2 tok/s (21%), which is an
+      order of magnitude larger than any plausible policy effect.
+
+CONCLUSION: policy-3 idle overhead is not measurable above thermal noise on a
+heat-soaked M4 (the block drifts ~21% top-to-bottom). Combined with the
+mechanism (idle path == baseline graph), the honest claim is "no measurable
+per-token overhead when idle", stronger and cleaner than a single-pair number.
+The old 0.77% was itself within this same noise band. A hard number with error
+bars would require a randomized-block sweep with cooldowns on a cool device
+(same treatment the alpha sweep got) — flagged for judgment, not done here.

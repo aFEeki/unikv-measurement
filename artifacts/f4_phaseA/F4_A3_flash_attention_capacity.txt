@@ -1,0 +1,105 @@
+*** RATIO CORRECTION 2026-08-07: the 'x budget' figures below were
+    recomputed against 16384 MiB (= 17179.89 MB) after a MB/MiB unit
+    error was found. MiB values and all outcomes are unchanged.
+    See artifacts/CORRECTION_2026-08-07_budget_units.txt ***
+
+F4 / A3 — flash-attention-on capacity re-run
+============================================
+Run 2026-08-05. Harness: scripts/run_f4_phaseA.py (UNIKV_F4=A3)
+Data: stress_results/f4_a3_flash_attn_capacity.csv
+Logs: artifacts/f4_phaseA/logs/gen_A3_p0_fa_on_c*.txt
+Maps to: Finding 4 (capacity limits appear at execution).
+
+*** THIS RESULT CONTRADICTS A CLAIM IN THE LIVE DRAFT. IT MUST BE FIXED
+    BEFORE THE PREPRINT IS POSTED, NOT AFTER. ***
+
+QUESTION
+--------
+Finding 4's ceiling is measured with flash attention off, to match the spill
+path, which cannot use the fused kernel. The draft then makes two statements
+that are in tension:
+
+  (i)  "the ceiling above is measured with flash attention off, and a
+        fused-kernel build reaches a higher C before meeting the same wall"
+        -- asserted, never run;
+  (ii) "A 65536-token prompt has no upstream setting that runs it: below the
+        ceiling the prompt does not fit, and above it the driver refuses."
+
+If (i) is true then (ii) may be false, because the scratch term is exactly what
+the fused kernel removes. Run the fused build against the same workload.
+
+RESULT — (ii) IS FALSE AS STATED
+---------------------------------
+Stock upstream (policy 0), flash attention ON, 65536-token prompt + 32 decode:
+
+  C       flash_attn  KV MiB  scratch MiB  device MiB  x budget  outcome
+  65536   enabled       8192        258.5     13135.8     0.802  prompt too long
+                                                                 (needs C > 65540)
+  73728   enabled       9216        258.5     14159.8     0.864  COMPLETES
+
+The same C=73728 configuration with flash attention OFF (capacity_demo.csv,
+arm B) allocated 4772 MiB of scratch, reached 18673 MiB total, 1.140x the
+advisory budget, and was refused by the driver.
+
+  FA off, C=73728:  scratch 4772.0 MiB -> device 18673 MiB (1.140x) -> GPU OOM
+  FA on,  C=73728:  scratch  258.5 MiB -> device 14160 MiB (0.864x) -> completes
+
+Flash attention collapses the scratch term by 18x, which is what moves the
+working set back under the budget.
+
+Throughput of the completing run: 65536-token prefill in 494.5 s, then 32
+tokens at 15.99 tok/s. On the identical workload, exact retention (policy 3,
+C=4096, host tier) ran at 1.50 tok/s decode -- so the fused upstream build is
+also 10.7x faster at it.
+
+TWO CONSEQUENCES, THE SECOND SHARPER THAN THE FIRST
+----------------------------------------------------
+1. The scratch term is an artefact of the NON-FUSED path, not a property of the
+   device. With flash attention on the scratch is CONSTANT at 258.5 MiB --
+   identical at C=65536 and C=73728 -- rather than proportional to C. So the
+   193 KiB/token accounting in Finding 4 is specific to the fa-off path; the
+   fused path costs ~128 KiB/token plus a fixed ~258 MiB, which puts the fused
+   ceiling near C = (16383 - 4685 - 258)/128 KiB ~= 91000 tokens, versus the
+   measured 49152-65536 for fa-off. A1 quantifies the fa-off side of this.
+
+2. At C=73728 with flash attention on, the ENTIRE 65536-token prompt fits in the
+   cache. Upstream is not merely completing the workload, it is completing it
+   WITHOUT DISCARDING ANYTHING. So on this workload the exact-retention arm has
+   no capacity advantage over a fused upstream build at all -- it is slower
+   (1.50 vs 15.99 tok/s) and holds no more context. The "beyond the ceiling"
+   demonstration survives only against the fa-off path, and the fa-off path
+   exists because OUR spill implementation requires it. That is a constraint of
+   the artefact, not of the hardware and not of upstream.
+
+WHAT THE DRAFT SHOULD SAY INSTEAD
+----------------------------------
+The defensible version of the paragraph is narrower, and should state the
+constraint rather than route around it:
+
+  With flash attention disabled -- the setting the exact-retention path requires,
+  since it needs the explicit softmax -- a 65536-token prompt has no upstream
+  setting that runs it on this device. A fused build is not so constrained: it
+  reaches C = 73728 within budget and runs the same workload at 15.99 tok/s,
+  holding the whole prompt. The capacity wall we document is therefore a
+  property of the non-fused path, and the comparison in this section should be
+  read as fa-off against fa-off.
+
+And the honest framing of the limitation, which belongs in threats to validity:
+the exact-retention mechanism forfeits the fused kernel, and on this workload
+that forfeit costs more capacity headroom than the mechanism recovers.
+
+NOT YET MEASURED (and worth one cheap run before posting)
+----------------------------------------------------------
+Where the FUSED ceiling actually is. The arithmetic above predicts ~91000
+tokens, but Finding 4's whole point is that arithmetic predicts the wrong wall
+and only execution finds the real one. A fa-on sweep upward from C=81920 would
+settle it and would make the corrected paragraph a measurement rather than
+another estimate. Not run here because A3 was scoped to the yes/no question.
+
+LIMITS
+------
+- One model, one device, one quantisation, one ubatch (512).
+- The fa-on prefill of 65536 tokens took 494 s; no repeat trial was run, since
+  the outcome of interest is binary (completes / refused), not the rate. The
+  15.99 tok/s decode figure is a single uninstrumented run and should be quoted
+  as approximate.

@@ -1,0 +1,23 @@
+prompt,arm,role,ctx,policy,spill_dev,rc,n_tokens,compared_tokens,first_divergence,identical,flash_attn,n_batch,n_ubatch,tok_per_sec,passkey_found,token_md5,duration_s,text_head
+passkey,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,33.437,True,5ffd5233262134c75926e3b88c59f6f7,27.3,"48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is always the "
+passkey,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,22.032,True,5ffd5233262134c75926e3b88c59f6f7,43.4,"48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is always the "
+passkey,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,30.697,True,5ffd5233262134c75926e3b88c59f6f7,29.8,"48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is always the "
+passkey,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,16,False,disabled,256,256,41.573,True,36259acc5b884a95c78c95cc3cbbbd65,23.3,"48291. Remember it. 48291 is the pass key. (The pass key is 48291.) 
+
+Note: The pass key is 48291. Remember it. 48291 is"
+passkey,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,33.614,True,40df4412d77339e82745f127a2bafd11,18.7,"48291. Remember it. 48291 is the pass key. (Note: The pass key is repeated many times in the text, but it is always the "
+prose,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,33.054,False,193a7fb427c7d2c437bc097a328a5d85,26.3,"pae](https://github.com/offline-ai/cpae)
+- Rust: [llama-rs](https://github.com/llama-rs/llama-rs)
+- C++: [llama-cpp](htt"
+prose,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,20.197,False,193a7fb427c7d2c437bc097a328a5d85,47.0,"pae](https://github.com/offline-ai/cpae)
+- Rust: [llama-rs](https://github.com/llama-rs/llama-rs)
+- C++: [llama-cpp](htt"
+prose,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,30.589,False,193a7fb427c7d2c437bc097a328a5d85,29.8,"pae](https://github.com/offline-ai/cpae)
+- Rust: [llama-rs](https://github.com/llama-rs/llama-rs)
+- C++: [llama-cpp](htt"
+prose,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,0,False,disabled,256,256,40.895,False,9b6d99114152013b580d72ca7dfc5c8b,23.8,"atalyst](https://github.com/offline-ai/catalyst)
+- Rust: [llama-rs](https://github.com/llama-rs/llama-rs)
+- C++: [llama-"
+prose,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,32.963,False,ff2f3e3b72aba2a60e4624277e973e03,19.2,"pae](https://github.com/offline-ai/cpae)
+- Rust: [llama-rs](https://github.com/llama-rs/llama-rs)
+- C++: [llama-cpp](htt"

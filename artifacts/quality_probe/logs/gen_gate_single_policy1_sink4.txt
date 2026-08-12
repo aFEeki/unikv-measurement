@@ -1,0 +1,52 @@
+=== STDOUT ===
+ 48291. 
+
+Now, let's look at the text again. What is the pattern of the text? The text is repeating the same phrases over and
+UNIKV_E2E decode_tokens=32 decode_ms=661.687 tok_per_sec=48.361
+
+
+
+=== STDERR (tail) ===
+,857] span=858 used=858 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,858] span=859 used=859 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,859] span=860 used=860 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,860] span=861 used=861 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,861] span=862 used=862 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,862] span=863 used=863 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,863] span=864 used=864 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,864] span=865 used=865 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,865] span=866 used=866 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,866] span=867 used=867 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,867] span=868 used=868 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,868] span=869 used=869 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,869] span=870 used=870 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,870] span=871 used=871 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,871] span=872 used=872 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,872] span=873 used=873 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,873] span=874 used=874 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,874] span=875 used=875 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,875] span=876 used=876 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,876] span=877 used=877 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,877] span=878 used=878 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,878] span=879 used=879 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,879] span=880 used=880 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,880] span=881 used=881 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,881] span=882 used=882 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,882] span=883 used=883 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,883] span=884 used=884 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,884] span=885 used=885 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,885] span=886 used=886 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,886] span=887 used=887 gap=0
+UNIKV_GAP decode-entry: seq_pos=[0,887] span=888 used=888 gap=0
+common_perf_print:    sampling time =       2.26 ms
+common_perf_print:    samplers time =       1.44 ms /   890 tokens
+common_perf_print:        load time =    1997.86 ms
+common_perf_print: prompt eval time =    1997.23 ms /   858 tokens (    2.33 ms per token,   429.59 tokens per second)
+common_perf_print:        eval time =     658.44 ms /    31 runs   (   21.24 ms per token,    47.08 tokens per second)
+common_perf_print:       total time =    2659.76 ms /   889 tokens
+common_perf_print: unaccounted time =       1.84 ms /   0.1 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =         30
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 11436 + (4946 =  4685 +     128 +     133) +           0 |
+common_memory_breakdown_print: |   - Host                |                   290 =   281 +       0 +       9                |
+ggml_metal_free: deallocating

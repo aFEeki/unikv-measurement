@@ -1,0 +1,4 @@
+arm,role,ctx,policy,spill_cap,rc,timed_out,duration_s,flash_attn,kv_device_mib,model_device_mib,compute_device_mib,device_total_mib,host_store_mib,metal_budget_mib,device_over_budget,prefill_ms,prefill_tokens,prefill_tok_per_sec,decode_tokens,decode_tok_per_sec
+A_stock_c32768,"stock, comfortably provisioned",32768,0,,0,False,62.7,disabled,4096.0,4685.3,2132.01,10913.3,,17179.89,0.635,57969.06,16384,282.6,64,17.924
+B_stock_c131072,"stock, over-provisioned (1.8x advisory budget)",131072,0,,1,False,1.6,disabled,16384.0,4685.3,8468.01,29537.3,,17179.89,1.719,,,,,
+C_unikv_c4096,"UniKV, bounded device window + host tier",4096,3,131072,0,False,238.6,disabled,512.0,4685.3,284.01,5481.3,16384.0,17179.89,0.319,229439.84,16384,71.4,64,8.871

@@ -1,0 +1,106 @@
+The ubatch/capacity trade — the paper asserts a cost the data does not show
+================================================================================
+2026-08-11. NO NEW RUNS. Re-analysis of stress_results/f4_a1_ubatch_sweep.csv
+(the F4 Phase A1 sweep, harness scripts/run_f4_phaseA.py, logs in
+artifacts/f4_phaseA/logs/).
+
+Prompted by the review note that the paper says lowering ubatch buys capacity
+but costs prefill parallelism, and leaves the cost unquantified. Checked before
+running anything, as instructed. Nothing needs to be run: the A1 sweep already
+measured prefill time at four ubatch settings, and it does not support the
+sentence as written.
+
+THE CLAIM
+---------
+Reducing ubatch shrinks the attention scratch buffer, which raises the maximum
+workable context; the paper concedes this "at a prefill-throughput cost" without
+saying how much. (The concession originates in artifacts/capacity_probe/
+capacity_analysis.txt, LIMITS, which flagged the sweep as not yet run. It has
+since been run.)
+
+WHAT THE SWEEP MEASURED
+-----------------------
+Policy 0, 16384-token prompt, 8 decoded tokens, -fa off (parsed as "disabled" on
+every run), -b 512 throughout, ubatch varied. Prefill throughput below is
+16384 / prefill_ms, computed here from the CSV's own prefill_ms column.
+
+  ub   C=49152        C=65536        C=81920        C=98304
+  64   259.6 tok/s    256.2 tok/s    250.0 tok/s    GPU_OOM
+ 128   259.4          253.9           65.8 (*)      GPU_OOM
+ 256   268.2          258.0          GPU_OOM         --
+ 512   237.0          GPU_OOM         --             --
+
+  (*) not a ubatch effect — see below.
+
+FINDING 1: THE CAPACITY GAIN IS REAL AND LARGE
+-----------------------------------------------
+Maximum workable context by ubatch: 81920 at ub64 and ub128, 65536 at ub256,
+49152 at ub512. Dropping ubatch from 512 to 64 raises the ceiling by 1.67x
+(49152 -> 81920 tokens), because the scratch term falls from 66.4 to 8.3 KiB per
+token of context — an 8x reduction in the C-scaled part of the device working
+set. That half of the paper's sentence is well supported.
+
+FINDING 2: THE PREFILL COST IS NOT VISIBLE IN THIS DATA
+--------------------------------------------------------
+At the one context all four settings can run (C=49152), prefill throughput is
+259.6 / 259.4 / 268.2 / 237.0 tok/s for ub 64/128/256/512. It is flat from 64 to
+256 — a 3.3% spread with no monotone trend — and the SLOWEST setting is the
+largest ubatch, which is the opposite of the predicted direction. The same
+pattern holds at C=65536 (256.2 / 253.9 / 258.0 across ub 64/128/256, a 1.6%
+spread).
+
+So on this machine, over ub 64-512 at a 16k prompt, reducing ubatch does not
+measurably cost prefill throughput.
+
+The likely reason is that prefill here is not parallelism-limited. With flash
+attention off the KQ matrix is materialised at n_kv x n_ubatch, so a larger
+ubatch buys wider GEMMs but proportionally more scratch traffic through unified
+memory; on an M4 Pro the bandwidth term appears to cancel the parallelism term
+over this range. That is an interpretation, not a measurement — the measurement
+is only that the difference is not there.
+
+WHY THE ub128/C=81920 OUTLIER IS NOT A COUNTEREXAMPLE
+------------------------------------------------------
+That cell reads 65.8 tok/s, 3.9x slower than everything else. It is not a ubatch
+effect: the same ub128 gives 259.4 and 253.9 tok/s at C=49152 and C=65536. It is
+the memory-pressure degradation at 0.946x of the advisory budget — the last
+configuration before the GPU_OOM cliff, where the working set is close enough to
+the limit that the system is paging rather than refusing. ub64 at the same C sits
+at 0.907x and runs at full speed. The cliff, not ubatch, explains it.
+
+This is worth a sentence in the paper on its own: between "completes at full
+speed" and "refuses to execute" there is a narrow band, somewhere between 0.907x
+and 1.02x of the advisory budget, where a configuration completes at roughly a
+quarter speed. F4 currently presents the boundary as a clean cliff. It is a cliff
+with one soft step in front of it, observed once.
+
+WHAT THE PAPER SHOULD SAY
+--------------------------
+Not "at a prefill-throughput cost" but something like: "on this machine the
+capacity gain is not offset by a measurable prefill penalty — over ubatch 64-512
+at a 16k prompt, prefill throughput varies by 3.3% with no monotone trend."
+
+LIMITS — WHY THIS IS A NEGATIVE RESULT AND NOT A POSITIVE ONE
+--------------------------------------------------------------
+These are n=1, uncooled, single-trial runs from a capacity sweep whose purpose
+was the OOM boundary, not throughput. The 237-268 tok/s spread is within the
+thermal variation seen elsewhere in this project across uncooled runs. So:
+
+  - "no measurable prefill penalty" is supported;
+  - "ub512 is 12% slower than ub256" is NOT supported by these data, and should
+    not be claimed either, even though it is the direction the numbers point;
+  - a cooled block would be needed to claim any ubatch ordering as real.
+
+The honest statement is that the paper currently asserts a cost it never
+measured, and the data it does have shows no such cost at the resolution
+available. Replacing an unmeasured assertion with a measured non-effect plus its
+resolution limit is a strict improvement; running a cooled ubatch block to
+resolve differences of a few percent would be a larger expenditure than the
+claim is worth, since the sentence's purpose is only to concede that "use a
+smaller ubatch" is a partial counter to Finding 5.
+
+CROSS-REFERENCE
+---------------
+artifacts/capacity_probe/capacity_analysis.txt LIMITS bullet 2 states the sweep
+was "not swept here" and predicts the trade. That bullet is now answered and
+should be updated to point at this file rather than left as an open item.
