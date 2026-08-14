@@ -46,8 +46,8 @@ TOL_FIT  = 0.002     # fitted coefficients
 # ---- LOCKED (B2 Block 1; figure conforms to these, not the reverse) --------
 # mode -> (intercept ms, slope us/cell, gamma ms)
 FITS = {
-    "cpu": (31.563, 3.0990, 9.009),
-    "dev": (25.423, 2.1531, 2.879),
+    "cpu": (31.317, 3.0990, 8.763),
+    "dev": (25.252, 2.1531, 2.708),
 }
 # mode -> {n_spill: (mean ms, sd ms)}
 POINTS = {
@@ -58,6 +58,7 @@ POINTS = {
 }
 NO_SPILL = 22.549    # the two references agree (t = -0.28); one shared line
 NMAX     = 8192
+OFFSET   = 79.5     # measured n_spill exceeds the harness target by this
 
 LABEL = {"cpu": "CPU-pinned tier", "dev": "device-visible tier"}
 DEVCOL = {"0": "cpu", "1": "dev"}
@@ -106,7 +107,7 @@ def verify():
             if abs(sd - sd_lock) > TOL_MS:
                 die(f"{SRC_CSV.name}: {mode} n={n} sd {sd:.3f}, locked {sd_lock}")
 
-        xs = [int(r["target"]) for r in rows
+        xs = [float(r["n_spill_mean"]) for r in rows
               if r["spill_dev"] == dev and int(r["target"]) > 0]
         ys = [float(r["ms_mean"]) for r in rows
               if r["spill_dev"] == dev and int(r["target"]) > 0]
@@ -162,9 +163,10 @@ def render():
     for mode in ("cpu", "dev"):
         a, b, _ = FITS[mode]
         ns = sorted(POINTS[mode])
+        px = [n + (OFFSET if n > 0 else 0.0) for n in ns]
         ax.plot(xs, line(mode), color=COLOR[mode], linewidth=1.2,
                 linestyle="-" if mode == "cpu" else "--", zorder=3)
-        ax.errorbar(ns, [POINTS[mode][n][0] for n in ns],
+        ax.errorbar(px, [POINTS[mode][n][0] for n in ns],
                     yerr=[POINTS[mode][n][1] for n in ns],
                     marker="o" if mode == "cpu" else "s", markersize=3.4,
                     color=COLOR[mode], markerfacecolor=COLOR[mode],

@@ -52,7 +52,7 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 
 | Claim | Harness | Data | Analysis |
 |---|---|---|---|
-| Eq. (1)–(2), γ, δ, Fig. 1 | `run_b2_cooled.py`, `make_fig5_recall_cost.py` | `stress_results/b2_isochronal_both_modes.csv` | `b2_cooled/B2_analysis.txt`; fit spec in `b2_cooled/REGRESSION_SPEC.txt` |
+| Eq. (1)–(2), γ, δ, Fig. 1 | `run_b2_cooled.py`, `make_fig5_recall_cost.py` | `stress_results/b2_isochronal_both_modes.csv` | `b2_cooled/B2_analysis.txt`; fit spec — including why the fit regresses on measured `n_spill` rather than the harness target — in `b2_cooled/REGRESSION_SPEC.txt` |
 | Isochronal design; confounded long-run slope | `run_recall_cost_isochronal.py` | `stress_results/recall_cost_steps_A_p3_long.csv`, `recall_cost_isochronal.csv` | `recall_cost/recall_cost_analysis.txt` — the design and the confounded slope stand, but its γ and δ are superseded by the B2 row above |
 | Device-visible tier; counterbalanced A/B failure | `run_b1_ceiling.py`, `run_b1_interleaved.py` | `stress_results/b1_device_tier_ceiling.csv`, `b1_interleaved_ab.csv` | `b1_gpu_tier/B1_triage.txt`, `B1_verification_and_ceiling.txt` |
 | Retrieval + 32-token continuation (Table 2) | `run_quality_arms_unified.py` | `quality_results/quality_arms_unified.csv` | `quality_unified/quality_arms_analysis.txt` |
