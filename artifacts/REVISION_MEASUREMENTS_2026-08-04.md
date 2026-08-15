@@ -479,3 +479,106 @@ brief's warning.
 `artifacts/drain_control/drain_control_analysis.txt` now carries a withdrawal
 header. Its RESULTS table and "the delay is invisible without the drain" section
 stand.
+
+---
+
+# Second model — Qwen2.5 7B Instruct Q4_K_M, one cooled night (2026-08-15)
+
+Full side-by-side: **`artifacts/CROSS_MODEL_SUMMARY.txt`**
+
+| block | status | result | data | analysis |
+|---|---|---|---|---|
+| B1 isochronal recall cost | done | γ prediction **fails**; δ resolves into a **tier-dependent** answer | `stress_results/qwen_isochronal_both_modes.csv` | `artifacts/qwen_cooled/qwen_block1_analysis.txt` |
+| B2 token identity | done | **Replicates exactly** — identical 512/512, both tiers, both prompts | `quality_results/token_horizon_qwen.csv` | `artifacts/token_horizon_qwen/qwen_token_identity_analysis.txt` |
+| Scratch/ceiling check | done | Scratch formula **confirmed** (0.875, 0.877); both ceilings inside prediction | `stress_results/f4_a1_ubatch_sweep_qwen.csv` | `artifacts/f4_phaseA_qwen/qwen_scratch_ceiling_analysis.txt` |
+
+Geometry parsed from the runtime, not assumed: `n_layer 28, n_head 28,
+n_head_kv 4, n_embd_k/v_gqa 512` → **KV = 56.00 KiB/cell exactly** vs Llama's
+128.00 (ratio 0.4375, as the brief predicted). Policies 3 and 4 both construct
+and run on `qwen2` unchanged — no finding about fork generality beyond that it
+holds. All harnesses were **parameterized rather than forked**, so both models
+run the same code path; Llama defaults verified unchanged.
+
+## LEAD: γ is not model-independent — the prediction fails
+
+| γ | Llama | Qwen | ratio |
+|---|---|---|---|
+| CPU-pinned (means / medians) | 8.762 / 8.640 ms | 4.119 / 5.216 ms | 0.470 / 0.604 |
+| device-visible (means / medians) | 2.708 / 2.656 ms | 1.918 / 1.906 ms | 0.708 / 0.718 |
+
+The paper attributes γ to graph shape and tier handoff and predicts it to be
+roughly model-independent. It falls 30% on the device-visible tier and 40–53% on
+CPU-pinned. The CPU-pinned ratio (0.470) sits close to the KV-bytes ratio
+(0.4375), so γ carries model-dependent staging work the paper books as fixed.
+
+## δ: the mechanism separates, and the answer differs by tier
+
+Predicted 0.4375× if δ is a bytes cost, 1.0× if a per-cell overhead.
+
+| δ | Llama | Qwen | ratio | verdict |
+|---|---|---|---|---|
+| CPU-pinned (means) | 3.0990 | 3.5779 ± 0.4135 | 1.155 | bytes **rejected** (t=5.4); unchanged consistent (t=1.1) |
+| CPU-pinned (medians) | 2.8531 | 2.6667 ± 0.2136 | 0.935 | bytes **rejected** (t=6.6); unchanged consistent (t=−0.9) |
+| device-visible (means) | 2.1531 | 1.7174 ± 0.0058 | 0.798 | **both rejected** (t=133 / −55) |
+| device-visible (medians) | 2.1549 | 1.7184 ± 0.0062 | 0.797 | **both rejected** |
+
+CPU-pinned δ is charged **per cell**, not per byte. Device-visible δ is
+**mixed**: solving δ = A + B×(KiB/cell) gives A = 1.379 µs/cell and B = 6.05
+ns/cell/KiB — 36% bytes, 64% size-independent at Llama's geometry.
+
+**Two caveats that bound this.** (a) With two models, A and B are two equations
+in two unknowns — a description, not a fitted law; what is established is the
+rejection of both one-parameter predictions. (b) KV/cell = 0.4375 factors as
+(28/32)×(512/1024), so a purely **per-layer** cost predicts 0.875 — also rejected
+(t=23), but far closer to the measurement than 0.4375 is. Two models cannot
+separate per-layer from per-byte. **A third model with Llama's layer count and
+Qwen's KV width would**, and that is now the specific next experiment.
+
+## Device-visible reduction: model-specific, not a property of the technique
+
+| | Llama | Qwen | paper claims |
+|---|---|---|---|
+| γ reduction | 69.1% | 53.5% | 69% |
+| δ reduction (means / medians) | 30.5% / 24.5% | 52.0% / 35.6% | 24.5–30.5% |
+
+## Scratch and ceiling: the formula predicts rather than describes
+
+Scratch = n_kv × n_ubatch × n_head → predicted head-count ratio 28/32 = 0.875.
+
+| | Llama | Qwen | ratio | predicted |
+|---|---|---|---|---|
+| scratch KiB/ctx-token, ub512 | 66.42 | 58.25 | 0.877 | 0.875 |
+| scratch KiB/ctx-token, ub256 | 33.21 | 29.06 | 0.875 | 0.875 |
+| ceiling, ub512 | 49152 | 98304–114688 | | ~109,000 ✓ |
+| ceiling, ub256 | 65536 | 131072–147456 | | ~145,000 ✓ |
+
+**Qwen completes at C=65536 at ub512 — the configuration where Llama is
+refused.** Both refusals are the execution-time Metal refusal at 1.035× and
+1.002× of budget, ~1.2 s in: Finding 4's mechanism reproduced on a second model.
+
+## Token identity replicates; the divergence index does not
+
+Exact retention identical 512/512 on both prompts and both tiers, same md5 as
+the reference, with 3321 cells spilled against 1024 resident (same as Llama) and
+zero spill lines in the reference. H2O still retrieves the passkey. It diverges
+at token **33** (passkey) and **28** (prose), against Llama's 16 and 0.
+
+The index is model-specific and must not be quoted as a property of the method.
+The prompt ordering also **flips** — prose diverges earlier than passkey on
+Llama, later on Qwen — so the "high-entropy prompts are harder to reproduce"
+reading suggested by the Llama block does not survive a second model, and that
+sentence in `artifacts/token_horizon/token_horizon_analysis.txt` should be
+softened to an observation about that one run.
+
+## Also replicated
+
+The two tier modes agree with nothing spilled (t = −0.66, matching the Llama
+check); the affine form holds on both tiers; slopes separable (t = 4.50 here,
+12.34 there); **and the CPU-pinned tier's heavy-tailed step time**, worse here —
+24 of 96 steps above 1.5× the median at n_spill=8271, max 148.8 ms, while
+device-visible stays within 1% of its median on both models. That is the Llama
+n_spill=4096 anomaly reproduced on a second model at a different spilled-set
+size on a quiet machine, so it is a property of the CPU-pinned tier. It also
+makes the Qwen CPU-pinned coefficients imprecise (slope SE 0.4135 vs
+device-visible's 0.0058), which is why every CPU-pinned claim above is reported
+on both estimators and none rests on a difference between them.

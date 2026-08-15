@@ -1,0 +1,122 @@
+Qwen2.5-7B block 2 — token identity at 512 tokens. It carries over unchanged.
+================================================================================
+Run 2026-08-15, 03:25. Harness: scripts/run_token_horizon.py (the same script as
+the Llama block, parameterised by UNIKV_MODEL/UNIKV_TAG).
+Data:    quality_results/token_horizon_qwen.csv
+Traces:  artifacts/token_horizon_qwen/sequences/*.txt (full 512-token id streams)
+Logs:    artifacts/token_horizon_qwen/logs/, console run.log. Exit 0, no flags.
+Llama counterpart: artifacts/token_horizon/token_horizon_analysis.txt
+
+PROTOCOL
+--------
+Identical to the Llama block: one block, -b 256 -ub 256, -fa off (parsed back as
+"disabled" on all ten runs), n_batch/n_ubatch parsed back as 256/256 on all ten,
+greedy, --temp 0, --seed 123, --ignore-eos, 512 generated tokens, prompts of
+exactly 3834 tokens, no cooldowns (identity under greedy decoding with a fixed
+seed is deterministic and thermally invariant).
+
+Arms: ref_c8192 (policy 0, no-eviction reference), p3_cpu_c1024,
+p3_dev_c1024, p4_h2o_c1024, and ctl_ref_c4096 (control for the reference's
+C-invariance, as in the Llama block).
+
+Both prompts were RE-SOLVED to 3834 tokens under Qwen's tokenizer rather than
+reused: the same probe text tokenizes to a different length. The passkey prompt
+keeps the same structure (same intro, same planted key 48291, same repetitive
+filler, same question) and the filler repeat count plus a single-token pad were
+solved for; the prose prompt is a README prefix binary-searched on characters.
+Both verified at exactly 3834.
+
+THE RESULT
+----------
+                                     first divergence from the reference
+  arm                   role                passkey        prose
+  p3_cpu_c1024   exact, CPU tier      none in 512     none in 512
+  p3_dev_c1024   exact, device tier   none in 512     none in 512
+  p4_h2o_c1024   H2O eviction         token 33        token 28
+  ctl_ref_c4096  CONTROL              none in 262     none in 262
+
+Whole-sequence identity, not prefix agreement: reference and both retention arms
+share one md5 per prompt (passkey 50becd014d, prose 9f38d8c94f).
+
+NOT VACUOUS. Both retention arms ended with 3321 cells in the host tier against
+1024 resident — the same 3321 as the Llama block, since the prompt length and C
+are the same — and H2O evicted the same 3321. The reference logs contain zero
+spill or eviction lines. So the identical arms performed 3321 spill-and-recall
+round trips on a second architecture and still landed on the same 512 tokens.
+
+CONTROL. ctl_ref_c4096 ran to exactly 262 generated tokens (3834 + 262 = 4096,
+the arithmetic confirming the cache filled rather than the run stopping for some
+other reason) and matched the C=8192 reference over all of them on both prompts.
+The reference does not depend on the cache size, so using C=8192 instead of the
+originally specified C=4096 — necessary because 3834 + 512 = 4346 > 4096 — is
+free. Same outcome as on Llama.
+
+H2O's divergence profile, agreement with the reference in 128-token windows:
+
+  window       passkey     prose
+  0-127         28.1%      51.6%
+  128-255        1.6%       3.1%
+  256-383        0.0%       1.6%
+  384-511        0.0%       4.7%
+  overall     38/512=7.4%  78/512=15.2%
+
+Both prompts decohere monotonically to floor level and stay there; on the
+passkey probe H2O reaches exact 0% agreement over the last 256 tokens.
+
+H2O IS NOT A STRAWMAN HERE EITHER. It retrieves the planted key: passkey_found
+is True for H2O on the passkey prompt, as for every other arm. The supported
+claim is that exact retention reproduces the reference token stream and H2O does
+not — not that H2O fails the task.
+
+COMPARISON WITH LLAMA — the property carries over, the indices do not
+----------------------------------------------------------------------
+  quantity                                   llama          qwen
+  exact retention, CPU tier            identical 512  identical 512
+  exact retention, device tier         identical 512  identical 512
+  H2O first divergence, passkey             token 16       token 33
+  H2O first divergence, prose                token 0       token 28
+  H2O overall agreement, passkey                 5.9%           7.4%
+  H2O overall agreement, prose                  32.8%          15.2%
+  cells spilled / evicted                        3321           3321
+  control agrees                                  yes            yes
+
+The identity property replicates exactly, on both tiers, on both prompts. That
+is the outcome the brief called the least interesting and it is the one that
+happened; there is nothing to explain away.
+
+The H2O divergence INDEX is model-specific and should never have been quoted as
+a property of the method. Llama diverged at 16 and 0; Qwen at 33 and 28. Both
+support "diverges within the first few dozen tokens on both prompts"; neither
+supports a specific index. Note the ordering across prompts also flips — on
+Llama the prose prompt diverged EARLIER than the passkey probe (0 vs 16), on
+Qwen LATER (28 vs 33) — so the "high-entropy prompts are harder to reproduce"
+reading that the Llama block suggested does not survive a second model, and the
+Llama analysis file's explanation of the ordering should be softened to an
+observation about that one run.
+
+WHAT THE PAPER CAN NOW SAY
+---------------------------
+"Exact retention reproduced the no-eviction reference bit-for-bit for 512
+generated tokens on two prompts, two spill tiers and two model architectures,
+while H2O at the same budget diverged within the first few dozen tokens in all
+four model-prompt combinations." That is a two-architecture claim, and it is the
+strongest statement in the paper that costs nothing to defend.
+
+THROUGHPUT — recorded, not quotable
+------------------------------------
+Uncooled, single trial, present only because the runs produced it (passkey /
+prose): ref 37.2/36.9, p3_cpu 26.0/24.9, p3_dev 34.7/34.6, h2o 43.7/43.3 tok/s.
+The ordering matches the cooled Qwen block 1, which is mild reassurance that
+nothing was misconfigured. No rate in the paper comes from here.
+
+LIMITS
+------
+- Two models, two prompts, one budget (C=1024), 512 tokens. "Identical to 512
+  generated tokens" is the claim; not "identical forever".
+- Exact retention is exact by construction — spilled K/V are recalled, not
+  approximated — so no mechanism here would break at token 513. The measurement
+  still stops where it stops.
+- H2O is our policy-4 implementation with the two deviations documented in
+  llama-unikv-h2o.h (scores aggregated over heads and layers because a llama.cpp
+  cell is shared; running sum rather than average). A different implementation
+  would diverge at a different index.

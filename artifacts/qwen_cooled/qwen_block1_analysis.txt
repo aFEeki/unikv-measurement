@@ -1,0 +1,233 @@
+Qwen2.5-7B block 1 — isochronal recall cost, both tier modes
+================================================================================
+Run 2026-08-15, 01:05-03:15. Harness: scripts/run_b2_cooled.py (the SAME script
+that produced the Llama block, parameterised by UNIKV_MODEL/UNIKV_TAG rather
+than forked, so the protocol cannot drift between models).
+Invocation: UNIKV_MODEL=<qwen.gguf> UNIKV_TAG=qwen UNIKV_B2=1 UNIKV_ISO_EXTRA=0
+Data:    stress_results/qwen_isochronal_both_modes.csv (36 runs)
+Console: artifacts/qwen_cooled/block1.log     Logs: artifacts/qwen_cooled/logs/
+Fit:     scripts/analyze_isochronal.py, implementing
+         artifacts/b2_cooled/REGRESSION_SPEC.txt literally.
+
+MODEL GEOMETRY — PARSED FROM THE RUNTIME, NOT ASSUMED
+------------------------------------------------------
+  print_info: arch = qwen2, n_layer = 28, n_head = 28, n_head_kv = 4,
+              n_embd_head_k = n_embd_head_v = 128, n_embd_k_gqa = n_embd_v_gqa = 512
+  llama_kv_cache: size = 56.00 MiB (1024 cells, 28 layers), K (f16) 28.00 MiB,
+                  V (f16) 28.00 MiB
+
+  KV per cell = 56.00 KiB exactly   (28 x (512+512) x 2 B = 57344 B)
+  Llama 3.1 8B, same parse         = 128.00 KiB  (32 x (1024+1024) x 2 B)
+  ratio = 0.4375
+
+Confirmed independently by the spill store: "host spill store = 224.00 MiB
+(4096 cells, 28 layers)" = 56.00 KiB/cell. The brief's estimate of ~56 KiB was
+correct, so no prediction below needed recomputing.
+
+FORK GENERALITY — both policies construct and run on qwen2
+------------------------------------------------------------
+Policy 3 CPU-pinned, policy 3 device-visible and policy 4 (H2O) all construct,
+spill/evict and decode on this architecture with no code change. The tier-mode
+line the harness asserts on ("unikv_spill_init: spilled tier -> MTL0
+(device-visible)") is emitted. No arm refused, so there is nothing to report
+about the fork's generality except that it holds for a second architecture.
+
+PROTOCOL AND DEVIATIONS
+-----------------------
+Identical to Llama block 1: C=1024, targets n_spill in {0, 512, 1024, 2048,
+4096, 8192} x {CPU-pinned, device-visible}, 128-step burst with the first 32
+steps discarded, -b/-ub 512, -fa off, greedy, seed 123, EOS disabled, cooled
+randomised block with 200 s cooldowns, instrumented (per-step wall clock IS the
+measurement here). 36 runs, all rc=0, flash_attn parsed back as "disabled" on
+every one, no harness flags raised. No exclusions.
+
+Two deliberate differences from the Llama block, both required rather than
+chosen:
+
+1. THREE trials at every cell, where Llama gave five to CPU-pinned n_spill=4096.
+   That exception existed to re-test a Llama-specific 44.0-60.9 ms anomaly and
+   has no counterpart here. The brief specified three.
+2. The prompt builder now SOLVES for the exact token count. The original assumed
+   " token" is one token AND that the tokenizer prepends exactly one BOS, so
+   n-1 repeats give n. Llama 3.1 does prepend one; Qwen2.5 does not. All six
+   prompts (512, 1536, 2048, 3072, 5120, 9216) were verified to land exactly.
+
+The Llama configuration was re-checked after the change and is unaffected.
+
+RESULTS — fit per REGRESSION_SPEC (per-run, measured n_spill regressor)
+------------------------------------------------------------------------
+  CPU-pinned                             device-visible
+    n_spill    n   ms/step    sd           n_spill    n   ms/step    sd
+          0    3    21.232  0.056                0    3    21.195  0.080
+      591.5    3    29.392  0.202            591.5    3    24.139  0.028
+     1103.5    3    30.345  0.088           1103.5    3    24.967  0.031
+     2127.5    3    32.112  0.110           2127.5    3    26.734  0.024
+     4175.5    3    36.131  0.432           4175.5    3    30.383  0.045
+     8271.5    3    56.988  9.450           8271.5    3    37.281  0.026
+
+  CPU-pinned      t = 25.351 ms + 3.5779 us/cell   slope SE 0.4135, resid SD 4.473
+                  (n=15, df=13)   no-spill 21.232 ms  ->  gamma = 4.119 ms
+                  on medians: 26.448 ms + 2.6667 us/cell (SE 0.2136), gamma 5.216 ms
+  device-visible  t = 23.113 ms + 1.7174 us/cell   slope SE 0.0058, resid SD 0.063
+                  (n=15, df=13)   no-spill 21.195 ms  ->  gamma = 1.918 ms
+                  on medians: 23.101 ms + 1.7184 us/cell (SE 0.0062), gamma 1.906 ms
+
+  no-spill references agree: 21.232 vs 21.195 ms, difference -0.037 +/- 0.056,
+  t = -0.66 -> the tier is inert at idle, replicating the Llama check.
+
+  slopes separable: 3.5779 - 1.7174 = 1.8606 +/- 0.4135, t = 4.50 -> SEPARABLE.
+  Device-visible delta is lower on this model too, as on Llama (t = 12.34).
+
+THE CPU-PINNED TIER IS HEAVY-TAILED, AND MORE SO HERE THAN ON LLAMA
+---------------------------------------------------------------------
+The 9.450 ms cell SD at n_spill=8271 is not measurement noise between runs; it
+is a right tail WITHIN each run. Per-step distributions over the 96 measured
+steps (artifacts/qwen_cooled/logs/step_*):
+
+  QWEN  CPU-pinned    median   mean    p90     p99     max   steps >1.5x median
+        trial 1        49.86  56.96  84.88  110.20  110.82   15/96
+        trial 2        44.65  47.55  54.19   64.54   65.02    0/96
+        trial 3        54.27  66.45 103.18  124.27  148.78   24/96
+  QWEN  device-vis     37.30  37.31  37.48   37.87   38.03    0/96  (and t2, t3)
+  LLAMA CPU-pinned     55.90  58.43  67.24   73.81   78.51    0/96  (and t2, t3)
+  LLAMA device-vis     43.07  43.10  43.27   43.77   44.04    0/96  (and t2, t3)
+
+The device-visible tier is essentially deterministic on BOTH models — p99 within
+1% of the median. The CPU-pinned tier is right-skewed on both, and on Qwen at
+the largest spilled set it produces steps up to 2.7x the median. This is the
+same signature as the Llama CPU-pinned n_spill=4096 anomaly that earned five
+trials, now reproduced on a second model, at a different spilled-set size, on a
+quiet machine. It is a property of the CPU-pinned tier, not a machine artifact.
+
+CONSEQUENCE FOR THE FIT: the CPU-pinned mean-based slope is inflated and
+imprecise (SE 0.4135 against device-visible's 0.0058; residual SD 4.473 ms
+against 0.063). Every CPU-pinned claim below is therefore reported on BOTH
+estimators, and no CPU-pinned conclusion is drawn that the two disagree about.
+They agree on everything that matters here.
+
+PREDICTION 1 — delta: bandwidth to the pages, or per-cell overhead?
+--------------------------------------------------------------------
+Predicted: 0.4375 x Llama's if delta is a BYTES cost; 1.0 x if it is a per-cell
+overhead independent of size.
+
+  CPU-pinned      [means]   llama 3.0990  qwen 3.5779 +/- 0.4135   ratio 1.155
+                    vs bytes (1.3558): t = +5.37  REJECTED
+                    vs unchanged      : t = +1.14  consistent
+                  [medians] llama 2.8531  qwen 2.6667 +/- 0.2136   ratio 0.935
+                    vs bytes (1.2483): t = +6.64  REJECTED
+                    vs unchanged      : t = -0.85  consistent
+
+  device-visible  [means]   llama 2.1531  qwen 1.7174 +/- 0.0058   ratio 0.798
+                    vs bytes (0.9420): t = +132.6  REJECTED
+                    vs unchanged      : t =  -54.5  REJECTED
+                  [medians] llama 2.1549  qwen 1.7184 +/- 0.0062   ratio 0.797
+                    (both estimators agree to the third decimal)
+
+ANSWER: the two tiers give different answers, and that is the result.
+
+  On the CPU-PINNED tier delta does NOT track bytes. It is consistent with being
+  unchanged across a 2.3x change in KV per cell, on both estimators. Whatever
+  delta measures there, it is charged per CELL, not per byte.
+
+  On the DEVICE-VISIBLE tier delta rejects BOTH pure hypotheses. It sits at
+  0.798 +/- 0.003 of Llama's, strictly between 0.4375 and 1.0, and the two
+  estimators agree to three decimals. Solving delta = A + B x (KiB per cell)
+  across the two blocks:
+
+      A = 1.379 us/cell (size-independent)   B = 6.05 ns/cell per KiB
+
+  so at Llama's 128 KiB/cell the bytes term is 36.0% of delta and the fixed
+  per-cell term is 64.0%; at Qwen's 56 KiB/cell the bytes term is 19.7%.
+
+This is the separation Finding 1 says it cannot make, and the honest form of the
+answer is "both mechanisms, in a proportion that depends on the tier" rather
+than either single mechanism.
+
+  CAVEAT ON THE DECOMPOSITION, WHICH MATTERS: with exactly two models, A and B
+  are determined by two equations in two unknowns. There is no residual and no
+  degrees of freedom — that is a DESCRIPTION consistent with both blocks, not a
+  fitted law, and it cannot be checked without a third model. What is genuinely
+  established is the REJECTION of both one-parameter predictions on the
+  device-visible arm, which is estimator-stable and enormous in t.
+
+  CONFOUND, ALSO IMPORTANT: the two models do not differ only in bytes per cell.
+  KV/cell factors as n_layer x per-layer width: 0.4375 = (28/32) x (512/1024)
+  = 0.875 x 0.5. A purely PER-LAYER cost would predict a ratio of 0.875. The
+  measured device-visible ratio is 0.798 +/- 0.003, which rejects 0.875 too
+  (t = 23) — but it lies much closer to the per-layer prediction than to the
+  bytes prediction. Two models cannot separate a per-layer term from a per-byte
+  term, because both differ together. A third model with Llama's layer count and
+  Qwen's KV width (or the reverse) would separate them, and that is the specific
+  experiment this result now motivates.
+
+PREDICTION 2 — gamma: is the fixed term model-independent? NO. THIS FAILS.
+----------------------------------------------------------------------------
+Predicted roughly model-independent, near 8.8 ms CPU-pinned and 2.7 ms
+device-visible, on the argument that gamma is a graph-shape and handoff cost.
+
+  CPU-pinned      [means]   llama 8.762 ms  qwen 4.119 ms   ratio 0.470
+                  [medians] llama 8.640 ms  qwen 5.216 ms   ratio 0.604
+  device-visible  [means]   llama 2.708 ms  qwen 1.918 ms   ratio 0.708
+                  [medians] llama 2.656 ms  qwen 1.906 ms   ratio 0.718
+
+gamma is NOT model-independent. It falls by 30% on the device-visible tier and
+by 40-53% on the CPU-pinned tier. The paper attributes gamma to graph shape and
+tier handoff; on that argument a 28-layer model with half the per-layer KV width
+should have paid roughly the same fixed entry cost, and it did not.
+
+The direction is informative rather than merely negative. On the CPU-pinned tier
+the gamma ratio (0.470 on means) is close to the KV-bytes ratio (0.4375), and on
+the device-visible tier it is closer to the layer ratio (0.875) than to bytes
+but below both. So gamma carries model-dependent work — plausibly a per-layer or
+per-byte staging cost paid once on entry to the two-tier path — that the paper
+currently books as a fixed property of the graph. The paper should either
+measure what gamma is made of or stop claiming it is model-independent.
+
+Note the estimator disagreement on CPU-pinned gamma (0.470 vs 0.604) is larger
+than elsewhere, because gamma inherits the heavy-tailed intercept. The claim
+"gamma is not model-independent" survives both; the ratio should be quoted as a
+range, not a point.
+
+PREDICTION 3 — the device-visible reduction
+---------------------------------------------
+The paper claims device-visibility removes 69% of gamma and 24.5-30.5% of delta.
+
+              gamma reduction   delta (means)   delta (medians)
+  llama            69.1%            30.5%           24.5%
+  qwen             53.5%            52.0%           35.6%
+
+Neither figure carries over. The gamma reduction is smaller on Qwen (53.5% vs
+69.1%) and the delta reduction is LARGER (52.0% vs 30.5% on means; 35.6% vs
+24.5% on medians). The qualitative claim — device-visibility reduces both terms,
+and the two slopes are separable — replicates on both models. The percentages do
+not, and should be presented as this-model numbers rather than as properties of
+the technique.
+
+WHAT REPLICATED, PLAINLY
+-------------------------
+  - policies 3 and 4 construct and run on a second architecture
+  - the no-spill references of the two tier modes agree (t = -0.66 here,
+    matching the Llama check) — the tier is inert at idle
+  - the affine form holds on both tiers on both models
+  - device-visible delta < CPU-pinned delta, separable (t = 4.50 here, 12.34 there)
+  - the CPU-pinned tier's heavy-tailed step time, at a different spilled-set size
+  - device-visible step times are near-deterministic (p99 within 1% of median)
+
+WHAT DID NOT
+-------------
+  - gamma is not model-independent (prediction 2 fails outright)
+  - the 69% / 24.5-30.5% device-visible reductions are model-specific
+  - delta is not a single mechanism: per-cell on the CPU-pinned tier, mixed on
+    the device-visible tier
+
+LIMITS
+------
+- Two models, one machine, one runtime, one quantization (Q4_K_M), one C, one
+  burst length. The prediction test is only as strong as two points allow.
+- The layer/width confound above is the binding limitation on the delta result
+  and is not resolvable from this pair.
+- The CPU-pinned coefficients here are imprecise by comparison with every other
+  cell in either block; treat them as a range.
+- These two blocks are never pooled. Every cross-model number above is a
+  comparison of two independently fitted blocks, which is what makes it a
+  prediction test rather than a merged dataset.

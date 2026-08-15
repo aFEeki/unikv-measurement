@@ -43,11 +43,17 @@ LLAMA_DIR      = ROOT / "llama.cpp"
 BIN_DIR        = LLAMA_DIR / "build-m4pro-metal" / "bin"
 COMPLETION_BIN = BIN_DIR / "llama-completion"
 TOKENIZE_BIN   = BIN_DIR / "llama-tokenize"
-MODEL_PATH     = LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+# Model/tag overridable so a second model runs THIS code path; unset = Llama.
+MODEL_PATH  = Path(os.environ.get(
+    "UNIKV_MODEL", LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
+TAG         = os.environ.get("UNIKV_TAG", "")
+SUF         = f"_{TAG}" if TAG else ""
 
 RESULTS_DIR = ROOT / "stress_results"
-ART_DIR     = ROOT / "artifacts" / "f4_phaseA"
-PROMPTS_DIR = ROOT / "artifacts" / "capacity_probe" / "prompts"
+ART_DIR     = ROOT / "artifacts" / f"f4_phaseA{SUF}"
+# per-tag: prompt token counts are tokenizer-specific
+PROMPTS_DIR = (ROOT / "artifacts" / "capacity_probe" / "prompts" if not TAG
+               else ART_DIR / "prompts")
 LOGS_DIR    = ART_DIR / "logs"
 
 THREADS     = 10
@@ -70,20 +76,39 @@ BIG_GEN    = int(os.environ.get("UNIKV_F4_BIG_GEN", "32"))
 TIMEOUT_S = int(os.environ.get("UNIKV_F4_TIMEOUT", "7200"))
 
 
+def count_tokens(path: Path) -> int:
+    out = subprocess.run(
+        [str(TOKENIZE_BIN), "-m", str(MODEL_PATH), "-f", str(path),
+         "--show-count", "--log-disable"],
+        cwd=LLAMA_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, errors="replace", check=True).stdout
+    m = re.search(r"Total number of tokens:\s*(\d+)", out)
+    if not m:
+        raise RuntimeError(f"token count parse failed for {path.name}:\n{out}")
+    return int(m.group(1))
+
+
 def ensure_prompt(n: int) -> Path:
+    """Exactly n tokens under whichever tokenizer MODEL_PATH carries.
+
+    The original assumed FIXED_TOKEN is one token AND that the tokenizer prepends
+    exactly one BOS (so n-1 repeats give n). Llama 3.1 does; Qwen2.5 does not.
+    Solve for the repeat count instead of assuming it."""
+    PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
     path = PROMPTS_DIR / f"prompt_{n}tok.txt"
-    if not path.exists():
-        PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-        path.write_text(FIXED_TOKEN * max(n - 1, 0))
-        out = subprocess.run(
-            [str(TOKENIZE_BIN), "-m", str(MODEL_PATH), "-f", str(path),
-             "--show-count", "--log-disable"],
-            cwd=LLAMA_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, errors="replace", check=True).stdout
-        m = re.search(r"Total number of tokens:\s*(\d+)", out)
-        if not m or int(m.group(1)) != n:
-            raise RuntimeError(f"prompt token mismatch for {n}: got {m.group(1) if m else '?'}")
-    return path
+    if path.exists() and count_tokens(path) == n:
+        return path
+    reps, seen = max(n - 1, 0), {}
+    for _ in range(16):
+        path.write_text(FIXED_TOKEN * reps)
+        got = seen[reps] = count_tokens(path)
+        if got == n:
+            return path
+        nxt = reps + (n - got)
+        if nxt in seen or nxt <= 0:
+            break
+        reps = nxt
+    raise RuntimeError(f"prompt token mismatch for {n}: repeat count -> {seen}")
 
 
 def run(tag, prompt, ctx, policy, fa, ubatch, batch, gen,
@@ -234,7 +259,7 @@ def main() -> int:
                 if r["outcome"] == "GPU_OOM":
                     print(f"     -> ceiling for ubatch {ub} is below C={ctx}")
                     break
-        write(rows, "f4_a1_ubatch_sweep.csv")
+        write(rows, f"f4_a1_ubatch_sweep{SUF}.csv")
         print()
 
     # ---------------- A2: continuation policies at the big workload ----------

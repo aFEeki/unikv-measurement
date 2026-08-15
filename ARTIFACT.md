@@ -64,6 +64,7 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 | Scratch term, ceilings, ubatch linearity, prefill non-effect (Table 6, Fig. 2) | `run_f4_phaseA.py`, `make_fig6_capacity.py` | `stress_results/f4_a1_ubatch_sweep.csv` | `f4_phaseA/F4_A1_ubatch_sweep.txt`, `ubatch_prefill_tradeoff.txt` |
 | Upstream completes the 65k workload (Table 7) | `run_capacity_workload.py` | `stress_results/f4_a2_continuation_arms.csv`, `f4_a3_flash_attn_capacity.csv` | `f4_phaseA/F4_A2_continuation_arms.txt`, `F4_A3_flash_attention_capacity.txt` |
 | Allocation vs. execution; advisory-budget ratios | `run_capacity_probe.py` | `stress_results/capacity_probe.csv` | `capacity_probe/capacity_analysis.txt`; unit correction in `CORRECTION_2026-08-07_budget_units.txt` |
+| Cross-model test (Qwen2.5 7B): Finding 1 coefficients, Finding 4 scratch prediction, Finding 2 replication | `run_b2_cooled.py`, `run_f4_phaseA.py`, `run_token_horizon.py`, `analyze_isochronal.py` | `stress_results/qwen_isochronal_both_modes.csv`, `f4_a1_ubatch_sweep_qwen.csv`, `quality_results/token_horizon_qwen.csv` | `CROSS_MODEL_SUMMARY.txt`; per-block analyses in `qwen_cooled/`, `f4_phaseA_qwen/`, `token_horizon_qwen/` |
 | Policy comparison, exactness premium (Table 8) | `run_b2_cooled.py` | `stress_results/b2_policy_block.csv` | `b2_cooled/B2_analysis.txt` — supersedes `r3_policy_compare/policy_compare_analysis.txt` and its `r3_policy_compare_cooled_master.csv`, which lack the device-visible arm |
 
 Where two analysis files are listed, the second corrects the first. Those entries

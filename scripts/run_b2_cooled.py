@@ -67,11 +67,21 @@ LLAMA_DIR      = ROOT / "llama.cpp"
 BIN_DIR        = LLAMA_DIR / "build-m4pro-metal" / "bin"
 COMPLETION_BIN = BIN_DIR / "llama-completion"
 TOKENIZE_BIN   = BIN_DIR / "llama-tokenize"
-MODEL_PATH     = LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+
+# MODEL AND TAG ARE OVERRIDABLE so a second model runs THIS code path rather than
+# a forked copy of it. With both unset the Llama block reproduces byte for byte.
+#   UNIKV_MODEL      absolute path to the .gguf            (default: Llama 3.1 8B)
+#   UNIKV_TAG        output-name prefix and artifacts dir  (default: b2)
+#   UNIKV_ISO_EXTRA  0 disables the 5-trial exception at CPU-pinned n_spill=4096,
+#                    which existed to re-test a Llama-specific 44.0-60.9 ms
+#                    anomaly and has no counterpart on another model
+MODEL_PATH  = Path(os.environ.get(
+    "UNIKV_MODEL", LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
+TAG         = os.environ.get("UNIKV_TAG", "b2")
 
 RESULTS_DIR = ROOT / "stress_results"
-ART_DIR     = ROOT / "artifacts" / "b2_cooled"
-PROMPTS_DIR = ART_DIR / "prompts"
+ART_DIR     = ROOT / "artifacts" / f"{TAG}_cooled"
+PROMPTS_DIR = ART_DIR / "prompts"       # per-tag: token counts are tokenizer-specific
 LOGS_DIR    = ART_DIR / "logs"
 
 THREADS     = 10
@@ -92,7 +102,8 @@ ISO_TARGETS = [0, 512, 1024, 2048, 4096, 8192]
 ISO_BURST   = 128
 ISO_WARMUP  = 32          # drops the one-off graph-realloc step after prefill
 ISO_TRIALS  = 3
-ISO_EXTRA   = {("0", 4096): 5}   # (spill_dev, target) -> trial count override
+ISO_EXTRA   = ({} if os.environ.get("UNIKV_ISO_EXTRA", "1") == "0"
+               else {("0", 4096): 5})   # (spill_dev, target) -> trial count override
 
 # ---- block 2 ---------------------------------------------------------------
 POL_CTXS      = [1024, 2048]
@@ -110,21 +121,47 @@ POLICY_ARMS = {
 }
 
 
+def count_tokens(path: Path) -> int:
+    out = subprocess.run(
+        [str(TOKENIZE_BIN), "-m", str(MODEL_PATH), "-f", str(path),
+         "--show-count", "--log-disable"],
+        cwd=LLAMA_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, errors="replace", check=True).stdout
+    m = re.search(r"Total number of tokens:\s*(\d+)", out)
+    if not m:
+        raise RuntimeError(f"token count parse failed for {path.name}:\n{out}")
+    return int(m.group(1))
+
+
 def ensure_prompt(n: int) -> Path:
+    """A prompt of EXACTLY n tokens under whichever tokenizer MODEL_PATH carries.
+
+    The original form assumed FIXED_TOKEN is one token and that the tokenizer adds
+    exactly one BOS, which held for Llama 3.1 and need not hold for another model.
+    This solves for the repeat count instead and still fails loudly if it cannot
+    land on n exactly — the isochronal design depends on the prompt length, so an
+    approximate prompt would silently change the spilled-set size.
+    """
     PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
     path = PROMPTS_DIR / f"prompt_{n}tok.txt"
-    if not path.exists():
-        path.write_text(FIXED_TOKEN * max(n - 1, 0))
-        out = subprocess.run(
-            [str(TOKENIZE_BIN), "-m", str(MODEL_PATH), "-f", str(path),
-             "--show-count", "--log-disable"],
-            cwd=LLAMA_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, errors="replace", check=True).stdout
-        m = re.search(r"Total number of tokens:\s*(\d+)", out)
-        if not m or int(m.group(1)) != n:
-            raise RuntimeError(f"prompt token mismatch for {n}: "
-                               f"got {m.group(1) if m else '?'}")
-    return path
+    if path.exists() and count_tokens(path) == n:
+        return path
+
+    reps = max(n - 1, 0)
+    seen = {}
+    for _ in range(16):
+        path.write_text(FIXED_TOKEN * reps)
+        got = seen[reps] = count_tokens(path)
+        if got == n:
+            return path
+        nxt = reps + (n - got)
+        if nxt in seen or nxt <= 0:      # oscillating: FIXED_TOKEN is not 1 token
+            break
+        reps = nxt
+    raise RuntimeError(
+        f"could not build a {n}-token prompt for {MODEL_PATH.name}: "
+        f"repeat count -> token count {seen}. FIXED_TOKEN is probably not a "
+        f"single token under this tokenizer; pick a different unit string.")
 
 
 def iso_now(ts):
@@ -202,11 +239,12 @@ def block1():
             plan += [(dev, target, t) for t in range(1, n + 1)]
     random.Random(SHUFFLE).shuffle(plan)
     print(f"  {len(plan)} runs, randomized (seed {SHUFFLE}), {COOLDOWN_S}s cooldowns")
-    print(f"  n_spill=4096 CPU-pinned gets {ISO_EXTRA[('0', 4096)]} trials "
-          f"(re-testing the 44.0-60.9 ms anomaly)")
+    if ISO_EXTRA:
+        print(f"  n_spill=4096 CPU-pinned gets {ISO_EXTRA[('0', 4096)]} trials "
+              f"(re-testing the 44.0-60.9 ms anomaly)")
     print("  instrumented: per-step wall clock is the measurement here\n")
 
-    out = RESULTS_DIR / "b2_isochronal_both_modes.csv"
+    out = RESULTS_DIR / f"{TAG}_isochronal_both_modes.csv"
     fields = ["order_idx", "spill_dev", "target", "trial", "prompt_tokens", "rc",
               "measured_steps", "transient_ms", "n_spill_mean", "ms_mean",
               "ms_median", "ms_sd", "flash_attn", "tier_device_visible",
@@ -373,7 +411,7 @@ def block2():
           f"all other arms randomised")
     print("  order:", " ".join(f"{a}@{c}t{t}" for a, c, t in plan), "\n")
 
-    out = RESULTS_DIR / "b2_policy_block.csv"
+    out = RESULTS_DIR / f"{TAG}_policy_block.csv"
     fields = ["order_idx", "arm", "ctx", "policy", "spill_dev", "trial", "rc",
               "decode_tokens", "tok_per_sec", "flash_attn",
               "tier_device_visible", "duration_s", "t_start"]
@@ -460,7 +498,10 @@ def main() -> int:
     for p in (COMPLETION_BIN, TOKENIZE_BIN, MODEL_PATH):
         if not p.exists():
             raise FileNotFoundError(p)
-    print("B2 cooled blocks — requires an IDLE machine (see module docstring)\n")
+    print(f"B2 cooled blocks — requires an IDLE machine (see module docstring)")
+    print(f"  model = {MODEL_PATH.name}")
+    print(f"  tag   = {TAG}  -> stress_results/{TAG}_*.csv, {ART_DIR}")
+    print(f"  iso extra trials: {ISO_EXTRA or 'disabled'}\n")
     if "1" in WHICH:
         block1()
     if "2" in WHICH:

@@ -1,0 +1,6 @@
+budget_mib,ctx,decode_tokens,device_kib_per_ctx_token,device_total_mib,duration_s,fa_requested,flash_attn,gpu_oom_lines,kv_mib,model_mib,n_batch,n_ubatch,outcome,policy,prefill_ms,prompt_tokens,rc,scratch_kib_per_ctx_token,scratch_mib,tag,tok_per_sec,x_budget
+16384.01985168457,65536,8,114.25,11480.1,52.8,off,disabled,0,3584.0,4168.09,512,512,COMPLETES,0,50731.94,16384,0,58.25,3728.01,A1_ub512_c65536,23.501,0.701
+16384.01985168457,98304,8,114.17,15128.1,55.9,off,disabled,0,5376.0,4168.09,512,512,COMPLETES,0,53595.23,16384,0,58.17,5584.01,A1_ub512_c98304,23.493,0.923
+16384.01985168457,114688,,114.14,16952.1,1.2,off,disabled,8,6272.0,4168.09,512,512,GPU_OOM,0,,16384,1,58.14,6512.01,A1_ub512_c114688,,1.035
+16384.01985168457,131072,8,85.06,15056.1,52.8,off,disabled,0,7168.0,4168.09,512,256,COMPLETES,0,51129.62,16384,0,29.06,3720.0,A1_ub256_c131072,23.875,0.919
+16384.01985168457,147456,,85.06,16416.1,1.2,off,disabled,8,8064.0,4168.09,512,256,GPU_OOM,0,,16384,1,29.06,4184.0,A1_ub256_c147456,,1.002

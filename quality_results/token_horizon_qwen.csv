@@ -1,0 +1,28 @@
+prompt,arm,role,ctx,policy,spill_dev,rc,n_tokens,compared_tokens,first_divergence,identical,flash_attn,n_batch,n_ubatch,tok_per_sec,passkey_found,token_md5,duration_s,text_head
+passkey,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,37.15,True,50becd014d0e6e02ce58cae5a5f20c9a,23.4,"48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. This is the important piece of information hidden in"
+passkey,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,26.015,True,50becd014d0e6e02ce58cae5a5f20c9a,36.6,"48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. This is the important piece of information hidden in"
+passkey,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,34.745,True,50becd014d0e6e02ce58cae5a5f20c9a,26.5,"48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. This is the important piece of information hidden in"
+passkey,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,33,False,disabled,256,256,43.681,True,75c9ef126b21509b0ba7b79775d4f42f,21.9,"48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key i"
+passkey,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,37.331,True,72ba96b6250b6db66583de5c04d8a6c5,17.3,"48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. This is the important piece of information hidden in"
+prose,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,36.815,False,9f38d8c94f4396b076c3581993b2a420,23.9,"https://huggingface.co/collections/LiquidAI/lfm2-vl-686d721927015b2ad73eaa38)
+- [x] [Hunyuan-VL](https://huggingface.co/"
+prose,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,24.847,False,9f38d8c94f4396b076c3581993b2a420,39.1,"https://huggingface.co/collections/LiquidAI/lfm2-vl-686d721927015b2ad73eaa38)
+- [x] [Hunyuan-VL](https://huggingface.co/"
+prose,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,34.56,False,9f38d8c94f4396b076c3581993b2a420,26.5,"https://huggingface.co/collections/LiquidAI/lfm2-vl-686d721927015b2ad73eaa38)
+- [x] [Hunyuan-VL](https://huggingface.co/"
+prose,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,28,False,disabled,256,256,43.749,False,a40a62144f0458d2334d04672d8400c8,22.4,"https://huggingface.co/collections/LiquidAI/lfm2-vl-686d721927715b2adad9a221)
+- [x] [Hunyuan-VL](https://huggingface.co/"
+prose,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,36.491,False,59589a799a65d12a84ed18def69583ff,17.3,"https://huggingface.co/collections/LiquidAI/lfm2-vl-686d721927015b2ad73eaa38)
+- [x] [Hunyuan-VL](https://huggingface.co/"

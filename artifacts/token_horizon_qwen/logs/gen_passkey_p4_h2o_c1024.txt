@@ -1,0 +1,315 @@
+=== STDOUT ===
+ 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the pass key. 
+
+The pass key is 48291. Remember it. 48291 is the
+UNIKV_E2E decode_tokens=512 decode_ms=11721.340 tok_per_sec=43.681
+
+
+
+=== STDERR ===
+ h2o evicted 1 cells; 3064 evicted in total
+decode: unikv: h2o evicted 1 cells; 3065 evicted in total
+decode: unikv: h2o evicted 1 cells; 3066 evicted in total
+decode: unikv: h2o evicted 1 cells; 3067 evicted in total
+decode: unikv: h2o evicted 1 cells; 3068 evicted in total
+decode: unikv: h2o evicted 1 cells; 3069 evicted in total
+decode: unikv: h2o evicted 1 cells; 3070 evicted in total
+decode: unikv: h2o evicted 1 cells; 3071 evicted in total
+decode: unikv: h2o evicted 1 cells; 3072 evicted in total
+decode: unikv: h2o evicted 1 cells; 3073 evicted in total
+decode: unikv: h2o evicted 1 cells; 3074 evicted in total
+decode: unikv: h2o evicted 1 cells; 3075 evicted in total
+decode: unikv: h2o evicted 1 cells; 3076 evicted in total
+decode: unikv: h2o evicted 1 cells; 3077 evicted in total
+decode: unikv: h2o evicted 1 cells; 3078 evicted in total
+decode: unikv: h2o evicted 1 cells; 3079 evicted in total
+decode: unikv: h2o evicted 1 cells; 3080 evicted in total
+decode: unikv: h2o evicted 1 cells; 3081 evicted in total
+decode: unikv: h2o evicted 1 cells; 3082 evicted in total
+decode: unikv: h2o evicted 1 cells; 3083 evicted in total
+decode: unikv: h2o evicted 1 cells; 3084 evicted in total
+decode: unikv: h2o evicted 1 cells; 3085 evicted in total
+decode: unikv: h2o evicted 1 cells; 3086 evicted in total
+decode: unikv: h2o evicted 1 cells; 3087 evicted in total
+decode: unikv: h2o evicted 1 cells; 3088 evicted in total
+decode: unikv: h2o evicted 1 cells; 3089 evicted in total
+decode: unikv: h2o evicted 1 cells; 3090 evicted in total
+decode: unikv: h2o evicted 1 cells; 3091 evicted in total
+decode: unikv: h2o evicted 1 cells; 3092 evicted in total
+decode: unikv: h2o evicted 1 cells; 3093 evicted in total
+decode: unikv: h2o evicted 1 cells; 3094 evicted in total
+decode: unikv: h2o evicted 1 cells; 3095 evicted in total
+decode: unikv: h2o evicted 1 cells; 3096 evicted in total
+decode: unikv: h2o evicted 1 cells; 3097 evicted in total
+decode: unikv: h2o evicted 1 cells; 3098 evicted in total
+decode: unikv: h2o evicted 1 cells; 3099 evicted in total
+decode: unikv: h2o evicted 1 cells; 3100 evicted in total
+decode: unikv: h2o evicted 1 cells; 3101 evicted in total
+decode: unikv: h2o evicted 1 cells; 3102 evicted in total
+decode: unikv: h2o evicted 1 cells; 3103 evicted in total
+decode: unikv: h2o evicted 1 cells; 3104 evicted in total
+decode: unikv: h2o evicted 1 cells; 3105 evicted in total
+decode: unikv: h2o evicted 1 cells; 3106 evicted in total
+decode: unikv: h2o evicted 1 cells; 3107 evicted in total
+decode: unikv: h2o evicted 1 cells; 3108 evicted in total
+decode: unikv: h2o evicted 1 cells; 3109 evicted in total
+decode: unikv: h2o evicted 1 cells; 3110 evicted in total
+decode: unikv: h2o evicted 1 cells; 3111 evicted in total
+decode: unikv: h2o evicted 1 cells; 3112 evicted in total
+decode: unikv: h2o evicted 1 cells; 3113 evicted in total
+decode: unikv: h2o evicted 1 cells; 3114 evicted in total
+decode: unikv: h2o evicted 1 cells; 3115 evicted in total
+decode: unikv: h2o evicted 1 cells; 3116 evicted in total
+decode: unikv: h2o evicted 1 cells; 3117 evicted in total
+decode: unikv: h2o evicted 1 cells; 3118 evicted in total
+decode: unikv: h2o evicted 1 cells; 3119 evicted in total
+decode: unikv: h2o evicted 1 cells; 3120 evicted in total
+decode: unikv: h2o evicted 1 cells; 3121 evicted in total
+decode: unikv: h2o evicted 1 cells; 3122 evicted in total
+decode: unikv: h2o evicted 1 cells; 3123 evicted in total
+decode: unikv: h2o evicted 1 cells; 3124 evicted in total
+decode: unikv: h2o evicted 1 cells; 3125 evicted in total
+decode: unikv: h2o evicted 1 cells; 3126 evicted in total
+decode: unikv: h2o evicted 1 cells; 3127 evicted in total
+decode: unikv: h2o evicted 1 cells; 3128 evicted in total
+decode: unikv: h2o evicted 1 cells; 3129 evicted in total
+decode: unikv: h2o evicted 1 cells; 3130 evicted in total
+decode: unikv: h2o evicted 1 cells; 3131 evicted in total
+decode: unikv: h2o evicted 1 cells; 3132 evicted in total
+decode: unikv: h2o evicted 1 cells; 3133 evicted in total
+decode: unikv: h2o evicted 1 cells; 3134 evicted in total
+decode: unikv: h2o evicted 1 cells; 3135 evicted in total
+decode: unikv: h2o evicted 1 cells; 3136 evicted in total
+decode: unikv: h2o evicted 1 cells; 3137 evicted in total
+decode: unikv: h2o evicted 1 cells; 3138 evicted in total
+decode: unikv: h2o evicted 1 cells; 3139 evicted in total
+decode: unikv: h2o evicted 1 cells; 3140 evicted in total
+decode: unikv: h2o evicted 1 cells; 3141 evicted in total
+decode: unikv: h2o evicted 1 cells; 3142 evicted in total
+decode: unikv: h2o evicted 1 cells; 3143 evicted in total
+decode: unikv: h2o evicted 1 cells; 3144 evicted in total
+decode: unikv: h2o evicted 1 cells; 3145 evicted in total
+decode: unikv: h2o evicted 1 cells; 3146 evicted in total
+decode: unikv: h2o evicted 1 cells; 3147 evicted in total
+decode: unikv: h2o evicted 1 cells; 3148 evicted in total
+decode: unikv: h2o evicted 1 cells; 3149 evicted in total
+decode: unikv: h2o evicted 1 cells; 3150 evicted in total
+decode: unikv: h2o evicted 1 cells; 3151 evicted in total
+decode: unikv: h2o evicted 1 cells; 3152 evicted in total
+decode: unikv: h2o evicted 1 cells; 3153 evicted in total
+decode: unikv: h2o evicted 1 cells; 3154 evicted in total
+decode: unikv: h2o evicted 1 cells; 3155 evicted in total
+decode: unikv: h2o evicted 1 cells; 3156 evicted in total
+decode: unikv: h2o evicted 1 cells; 3157 evicted in total
+decode: unikv: h2o evicted 1 cells; 3158 evicted in total
+decode: unikv: h2o evicted 1 cells; 3159 evicted in total
+decode: unikv: h2o evicted 1 cells; 3160 evicted in total
+decode: unikv: h2o evicted 1 cells; 3161 evicted in total
+decode: unikv: h2o evicted 1 cells; 3162 evicted in total
+decode: unikv: h2o evicted 1 cells; 3163 evicted in total
+decode: unikv: h2o evicted 1 cells; 3164 evicted in total
+decode: unikv: h2o evicted 1 cells; 3165 evicted in total
+decode: unikv: h2o evicted 1 cells; 3166 evicted in total
+decode: unikv: h2o evicted 1 cells; 3167 evicted in total
+decode: unikv: h2o evicted 1 cells; 3168 evicted in total
+decode: unikv: h2o evicted 1 cells; 3169 evicted in total
+decode: unikv: h2o evicted 1 cells; 3170 evicted in total
+decode: unikv: h2o evicted 1 cells; 3171 evicted in total
+decode: unikv: h2o evicted 1 cells; 3172 evicted in total
+decode: unikv: h2o evicted 1 cells; 3173 evicted in total
+decode: unikv: h2o evicted 1 cells; 3174 evicted in total
+decode: unikv: h2o evicted 1 cells; 3175 evicted in total
+decode: unikv: h2o evicted 1 cells; 3176 evicted in total
+decode: unikv: h2o evicted 1 cells; 3177 evicted in total
+decode: unikv: h2o evicted 1 cells; 3178 evicted in total
+decode: unikv: h2o evicted 1 cells; 3179 evicted in total
+decode: unikv: h2o evicted 1 cells; 3180 evicted in total
+decode: unikv: h2o evicted 1 cells; 3181 evicted in total
+decode: unikv: h2o evicted 1 cells; 3182 evicted in total
+decode: unikv: h2o evicted 1 cells; 3183 evicted in total
+decode: unikv: h2o evicted 1 cells; 3184 evicted in total
+decode: unikv: h2o evicted 1 cells; 3185 evicted in total
+decode: unikv: h2o evicted 1 cells; 3186 evicted in total
+decode: unikv: h2o evicted 1 cells; 3187 evicted in total
+decode: unikv: h2o evicted 1 cells; 3188 evicted in total
+decode: unikv: h2o evicted 1 cells; 3189 evicted in total
+decode: unikv: h2o evicted 1 cells; 3190 evicted in total
+decode: unikv: h2o evicted 1 cells; 3191 evicted in total
+decode: unikv: h2o evicted 1 cells; 3192 evicted in total
+decode: unikv: h2o evicted 1 cells; 3193 evicted in total
+decode: unikv: h2o evicted 1 cells; 3194 evicted in total
+decode: unikv: h2o evicted 1 cells; 3195 evicted in total
+decode: unikv: h2o evicted 1 cells; 3196 evicted in total
+decode: unikv: h2o evicted 1 cells; 3197 evicted in total
+decode: unikv: h2o evicted 1 cells; 3198 evicted in total
+decode: unikv: h2o evicted 1 cells; 3199 evicted in total
+decode: unikv: h2o evicted 1 cells; 3200 evicted in total
+decode: unikv: h2o evicted 1 cells; 3201 evicted in total
+decode: unikv: h2o evicted 1 cells; 3202 evicted in total
+decode: unikv: h2o evicted 1 cells; 3203 evicted in total
+decode: unikv: h2o evicted 1 cells; 3204 evicted in total
+decode: unikv: h2o evicted 1 cells; 3205 evicted in total
+decode: unikv: h2o evicted 1 cells; 3206 evicted in total
+decode: unikv: h2o evicted 1 cells; 3207 evicted in total
+decode: unikv: h2o evicted 1 cells; 3208 evicted in total
+decode: unikv: h2o evicted 1 cells; 3209 evicted in total
+decode: unikv: h2o evicted 1 cells; 3210 evicted in total
+decode: unikv: h2o evicted 1 cells; 3211 evicted in total
+decode: unikv: h2o evicted 1 cells; 3212 evicted in total
+decode: unikv: h2o evicted 1 cells; 3213 evicted in total
+decode: unikv: h2o evicted 1 cells; 3214 evicted in total
+decode: unikv: h2o evicted 1 cells; 3215 evicted in total
+decode: unikv: h2o evicted 1 cells; 3216 evicted in total
+decode: unikv: h2o evicted 1 cells; 3217 evicted in total
+decode: unikv: h2o evicted 1 cells; 3218 evicted in total
+decode: unikv: h2o evicted 1 cells; 3219 evicted in total
+decode: unikv: h2o evicted 1 cells; 3220 evicted in total
+decode: unikv: h2o evicted 1 cells; 3221 evicted in total
+decode: unikv: h2o evicted 1 cells; 3222 evicted in total
+decode: unikv: h2o evicted 1 cells; 3223 evicted in total
+decode: unikv: h2o evicted 1 cells; 3224 evicted in total
+decode: unikv: h2o evicted 1 cells; 3225 evicted in total
+decode: unikv: h2o evicted 1 cells; 3226 evicted in total
+decode: unikv: h2o evicted 1 cells; 3227 evicted in total
+decode: unikv: h2o evicted 1 cells; 3228 evicted in total
+decode: unikv: h2o evicted 1 cells; 3229 evicted in total
+decode: unikv: h2o evicted 1 cells; 3230 evicted in total
+decode: unikv: h2o evicted 1 cells; 3231 evicted in total
+decode: unikv: h2o evicted 1 cells; 3232 evicted in total
+decode: unikv: h2o evicted 1 cells; 3233 evicted in total
+decode: unikv: h2o evicted 1 cells; 3234 evicted in total
+decode: unikv: h2o evicted 1 cells; 3235 evicted in total
+decode: unikv: h2o evicted 1 cells; 3236 evicted in total
+decode: unikv: h2o evicted 1 cells; 3237 evicted in total
+decode: unikv: h2o evicted 1 cells; 3238 evicted in total
+decode: unikv: h2o evicted 1 cells; 3239 evicted in total
+decode: unikv: h2o evicted 1 cells; 3240 evicted in total
+decode: unikv: h2o evicted 1 cells; 3241 evicted in total
+decode: unikv: h2o evicted 1 cells; 3242 evicted in total
+decode: unikv: h2o evicted 1 cells; 3243 evicted in total
+decode: unikv: h2o evicted 1 cells; 3244 evicted in total
+decode: unikv: h2o evicted 1 cells; 3245 evicted in total
+decode: unikv: h2o evicted 1 cells; 3246 evicted in total
+decode: unikv: h2o evicted 1 cells; 3247 evicted in total
+decode: unikv: h2o evicted 1 cells; 3248 evicted in total
+decode: unikv: h2o evicted 1 cells; 3249 evicted in total
+decode: unikv: h2o evicted 1 cells; 3250 evicted in total
+decode: unikv: h2o evicted 1 cells; 3251 evicted in total
+decode: unikv: h2o evicted 1 cells; 3252 evicted in total
+decode: unikv: h2o evicted 1 cells; 3253 evicted in total
+decode: unikv: h2o evicted 1 cells; 3254 evicted in total
+decode: unikv: h2o evicted 1 cells; 3255 evicted in total
+decode: unikv: h2o evicted 1 cells; 3256 evicted in total
+decode: unikv: h2o evicted 1 cells; 3257 evicted in total
+decode: unikv: h2o evicted 1 cells; 3258 evicted in total
+decode: unikv: h2o evicted 1 cells; 3259 evicted in total
+decode: unikv: h2o evicted 1 cells; 3260 evicted in total
+decode: unikv: h2o evicted 1 cells; 3261 evicted in total
+decode: unikv: h2o evicted 1 cells; 3262 evicted in total
+decode: unikv: h2o evicted 1 cells; 3263 evicted in total
+decode: unikv: h2o evicted 1 cells; 3264 evicted in total
+decode: unikv: h2o evicted 1 cells; 3265 evicted in total
+decode: unikv: h2o evicted 1 cells; 3266 evicted in total
+decode: unikv: h2o evicted 1 cells; 3267 evicted in total
+decode: unikv: h2o evicted 1 cells; 3268 evicted in total
+decode: unikv: h2o evicted 1 cells; 3269 evicted in total
+decode: unikv: h2o evicted 1 cells; 3270 evicted in total
+decode: unikv: h2o evicted 1 cells; 3271 evicted in total
+decode: unikv: h2o evicted 1 cells; 3272 evicted in total
+decode: unikv: h2o evicted 1 cells; 3273 evicted in total
+decode: unikv: h2o evicted 1 cells; 3274 evicted in total
+decode: unikv: h2o evicted 1 cells; 3275 evicted in total
+decode: unikv: h2o evicted 1 cells; 3276 evicted in total
+decode: unikv: h2o evicted 1 cells; 3277 evicted in total
+decode: unikv: h2o evicted 1 cells; 3278 evicted in total
+decode: unikv: h2o evicted 1 cells; 3279 evicted in total
+decode: unikv: h2o evicted 1 cells; 3280 evicted in total
+decode: unikv: h2o evicted 1 cells; 3281 evicted in total
+decode: unikv: h2o evicted 1 cells; 3282 evicted in total
+decode: unikv: h2o evicted 1 cells; 3283 evicted in total
+decode: unikv: h2o evicted 1 cells; 3284 evicted in total
+decode: unikv: h2o evicted 1 cells; 3285 evicted in total
+decode: unikv: h2o evicted 1 cells; 3286 evicted in total
+decode: unikv: h2o evicted 1 cells; 3287 evicted in total
+decode: unikv: h2o evicted 1 cells; 3288 evicted in total
+decode: unikv: h2o evicted 1 cells; 3289 evicted in total
+decode: unikv: h2o evicted 1 cells; 3290 evicted in total
+decode: unikv: h2o evicted 1 cells; 3291 evicted in total
+decode: unikv: h2o evicted 1 cells; 3292 evicted in total
+decode: unikv: h2o evicted 1 cells; 3293 evicted in total
+decode: unikv: h2o evicted 1 cells; 3294 evicted in total
+decode: unikv: h2o evicted 1 cells; 3295 evicted in total
+decode: unikv: h2o evicted 1 cells; 3296 evicted in total
+decode: unikv: h2o evicted 1 cells; 3297 evicted in total
+decode: unikv: h2o evicted 1 cells; 3298 evicted in total
+decode: unikv: h2o evicted 1 cells; 3299 evicted in total
+decode: unikv: h2o evicted 1 cells; 3300 evicted in total
+decode: unikv: h2o evicted 1 cells; 3301 evicted in total
+decode: unikv: h2o evicted 1 cells; 3302 evicted in total
+decode: unikv: h2o evicted 1 cells; 3303 evicted in total
+decode: unikv: h2o evicted 1 cells; 3304 evicted in total
+decode: unikv: h2o evicted 1 cells; 3305 evicted in total
+decode: unikv: h2o evicted 1 cells; 3306 evicted in total
+decode: unikv: h2o evicted 1 cells; 3307 evicted in total
+decode: unikv: h2o evicted 1 cells; 3308 evicted in total
+decode: unikv: h2o evicted 1 cells; 3309 evicted in total
+decode: unikv: h2o evicted 1 cells; 3310 evicted in total
+decode: unikv: h2o evicted 1 cells; 3311 evicted in total
+decode: unikv: h2o evicted 1 cells; 3312 evicted in total
+decode: unikv: h2o evicted 1 cells; 3313 evicted in total
+decode: unikv: h2o evicted 1 cells; 3314 evicted in total
+decode: unikv: h2o evicted 1 cells; 3315 evicted in total
+decode: unikv: h2o evicted 1 cells; 3316 evicted in total
+decode: unikv: h2o evicted 1 cells; 3317 evicted in total
+decode: unikv: h2o evicted 1 cells; 3318 evicted in total
+decode: unikv: h2o evicted 1 cells; 3319 evicted in total
+decode: unikv: h2o evicted 1 cells; 3320 evicted in total
+decode: unikv: h2o evicted 1 cells; 3321 evicted in total
+common_perf_print:    sampling time =      54.95 ms
+common_perf_print:    samplers time =      34.52 ms /  4346 tokens
+common_perf_print:        load time =    9704.25 ms
+common_perf_print: prompt eval time =    9701.98 ms /  3834 tokens (    2.53 ms per token,   395.18 tokens per second)
+common_perf_print:        eval time =   11653.46 ms /   511 runs   (   22.81 ms per token,    43.85 tokens per second)
+common_perf_print:       total time =   21426.18 ms /  4345 tokens
+common_perf_print: unaccounted time =      15.79 ms /   0.1 %      (total - sampling - prompt eval - eval) / (total)
+common_perf_print:    graphs reused =        520
+common_memory_breakdown_print: | memory breakdown [MiB]  | total    free    self   model   context   compute    unaccounted |
+common_memory_breakdown_print: |   - MTL0 (Apple M4 Pro) | 16384 = 12001 + (4381 =  4168 +      56 +     157) +           0 |
+common_memory_breakdown_print: |   - Host                |                   301 =   292 +       0 +       9                |
+ggml_metal_free: deallocating

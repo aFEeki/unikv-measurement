@@ -57,11 +57,16 @@ LLAMA_DIR      = ROOT / "llama.cpp"
 BIN_DIR        = LLAMA_DIR / "build-m4pro-metal" / "bin"
 COMPLETION_BIN = BIN_DIR / "llama-completion"
 TOKENIZE_BIN   = BIN_DIR / "llama-tokenize"
-MODEL_PATH     = LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+# Model and output tag are overridable so a second model runs THIS code path.
+# With both unset the Llama block reproduces exactly.
+MODEL_PATH     = Path(os.environ.get(
+    "UNIKV_MODEL", LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
+TAG            = os.environ.get("UNIKV_TAG", "")
+SUF            = f"_{TAG}" if TAG else ""
 PROSE_SRC      = LLAMA_DIR / "README.md"
 
 RESULTS_DIR = ROOT / "quality_results"
-ART_DIR     = ROOT / "artifacts" / "token_horizon"
+ART_DIR     = ROOT / "artifacts" / f"token_horizon{SUF}"
 PROMPTS_DIR = ART_DIR / "prompts"
 LOGS_DIR    = ART_DIR / "logs"
 
@@ -83,6 +88,7 @@ INTRO        = ("There is an important piece of information hidden inside the "
                 "about it at the end.\n\n")
 PASSKEY_LINE = f"\nThe pass key is {PASSKEY}. Remember it. {PASSKEY} is the pass key.\n\n"
 QUESTION     = "\nQuestion: What is the pass key?\nAnswer: The pass key is"
+PAD_TOKEN    = " token"     # one token in both tokenizers; used only to land exactly
 
 REFERENCE = "ref_c8192"
 # tag -> (ctx, policy, spill_dev, role)
@@ -109,12 +115,43 @@ def tok_count(path: Path) -> int:
 
 
 def build_passkey_prompt() -> Path:
+    """The published probe, solved to exactly PROMPT_TOKENS under this tokenizer.
+
+    The Llama version hard-coded 150 filler repeats and asserted the total. A
+    different tokenizer gives a different count for the same text, so the repeat
+    count is solved for here and the remainder padded with a single-token unit.
+    The prompt therefore stays the same PROBE (same intro, same planted key, same
+    question, same repetitive filler) at the same length across models, which is
+    what the comparison needs; only the repeat count moves."""
     p = PROMPTS_DIR / "prompt_passkey.txt"
-    p.write_text(INTRO + (FILLER * 7) + PASSKEY_LINE + (FILLER * 150) + QUESTION)
-    n = tok_count(p)
-    if n != PROMPT_TOKENS:
-        raise RuntimeError(f"passkey prompt is {n} tokens, expected {PROMPT_TOKENS}")
-    return p
+
+    def build(reps, pad):
+        p.write_text(INTRO + (FILLER * 7) + PASSKEY_LINE + (FILLER * reps)
+                     + (PAD_TOKEN * pad) + QUESTION)
+        return tok_count(p)
+
+    lo, hi, best = 0, 400, None      # largest repeat count that stays under budget
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if build(mid, 0) <= PROMPT_TOKENS:
+            best = mid; lo = mid + 1
+        else:
+            hi = mid - 1
+    if best is None:
+        raise RuntimeError("passkey scaffold alone exceeds the budget")
+    # Pad to the exact count. The pad count is SOLVED, not assumed: inserting the
+    # unit changes tokenization at the seams, so k pad units need not add k tokens.
+    pad, seen = 0, {}
+    for _ in range(16):
+        n = seen[pad] = build(best, pad)
+        if n == PROMPT_TOKENS:
+            return p
+        nxt = pad + (PROMPT_TOKENS - n)
+        if nxt in seen or nxt < 0:
+            break
+        pad = nxt
+    raise RuntimeError(f"passkey prompt: pad count -> token count {seen}, "
+                       f"never hit {PROMPT_TOKENS}")
 
 
 def build_prose_prompt() -> Path:
@@ -227,6 +264,7 @@ def main() -> int:
     prompts = {"passkey": build_passkey_prompt(), "prose": build_prose_prompt()}
     print(f"token-identity horizon: {GEN_TOKENS} generated tokens, "
           f"{len(prompts)} prompts x {len(ARMS)} arms")
+    print(f"  model {MODEL_PATH.name}")
     for name, path in prompts.items():
         print(f"  prompt {name:8s} {tok_count(path):5d} tokens  {path.name}")
     print(f"  -b {BATCH} -ub {UBATCH}, -fa off, greedy, seed {SEED}, --ignore-eos")
@@ -289,7 +327,7 @@ def main() -> int:
                          f"diverges at token {c['first_divergence']}. Every identity "
                          f"claim in the paper needs re-examining.")
 
-    out = RESULTS_DIR / "token_horizon.csv"
+    out = RESULTS_DIR / f"token_horizon{SUF}.csv"
     cols = ["prompt", "arm", "role", "ctx", "policy", "spill_dev", "rc", "n_tokens",
             "compared_tokens", "first_divergence", "identical", "flash_attn",
             "n_batch", "n_ubatch", "tok_per_sec", "passkey_found", "token_md5",

@@ -105,6 +105,14 @@ sixteen tokens of grace because the discarded context is largely redundant with
 what remains; the prose prompt gives it none, because the first generated token
 completes a URL that was truncated mid-word and the evidence for it was evicted.
 
+  *** QUALIFIED 2026-08-15 by the second model. The ORDERING does not replicate:
+      on Qwen2.5-7B the same two prompts diverge at token 33 (passkey) and 28
+      (prose), i.e. the prose prompt gives H2O MORE grace, not less. The
+      explanation above is a plausible reading of this one run and should not be
+      carried into the paper as a mechanism. What replicates on both models is
+      only that H2O diverges within the first few dozen tokens on both prompts.
+      See artifacts/token_horizon_qwen/qwen_token_identity_analysis.txt. ***
+
 FINDING 3: THE FULL TRACE, WHICH IS WHY THE RUN DID NOT STOP AT DIVERGENCE
 ----------------------------------------------------------------------------
 First-divergence index alone would have made the two prompts look like the same

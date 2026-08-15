@@ -1,0 +1,97 @@
+Qwen2.5-7B — the scratch-term prediction. It holds, to within 0.3%.
+================================================================================
+Run 2026-08-15, 03:40-04:00. Harness: scripts/run_f4_phaseA.py A1 (the same
+script as the Llama sweep, parameterised by UNIKV_MODEL/UNIKV_TAG).
+Data:    stress_results/f4_a1_ubatch_sweep_qwen.csv
+Logs:    artifacts/f4_phaseA_qwen/logs/, a1_ub512.log, a1_ub256.log
+Outcomes are binary (completes / driver refuses) and buffer sizes in MiB, so no
+thermal protocol is needed and none was used.
+
+THE PREDICTION, STATED BEFORE THE RUN
+---------------------------------------
+The paper models attention scratch as n_kv x n_ubatch x n_head, so per token of
+context it should scale with the HEAD count, independently of the KV geometry
+that drives everything else in this night's work. Qwen has 28 heads against
+Llama's 32:
+
+  predicted scratch ratio = 28/32 = 0.875
+
+and with a smaller KV term as well (56.0 vs 128.0 KiB/cell), a correspondingly
+higher context ceiling. Predicted per-context-token device cost and ceiling,
+computed from the parsed geometry and the model's own reported buffer sizes
+(Qwen model = 4168.09 + 292.36 = 4460.45 MiB; advisory budget 16383 MiB):
+
+  ub512:  56.0 KV + 56.0 scratch = 112.0 KiB/tok  ->  ceiling ~109,000 tokens
+  ub256:  56.0 KV + 28.0 scratch =  84.0 KiB/tok  ->  ceiling ~145,000 tokens
+
+Llama's MEASURED ceilings for comparison: 49152 at ub512 (65536 refused),
+65536 at ub256 (81920 refused).
+
+RESULT
+------
+  ub    C        outcome    x budget   scratch KiB/ctx-token   flash_attn
+  512   65536    COMPLETES    0.701           58.25            disabled
+  512   98304    COMPLETES    0.923           58.17            disabled
+  512  114688    GPU_OOM      1.035           58.14            disabled
+  256  131072    COMPLETES    0.919           29.06            disabled
+  256  147456    GPU_OOM      1.002           29.06            disabled
+
+1. THE SCRATCH COEFFICIENT MATCHES THE FORMULA
+   measured   Qwen 58.25 / Llama 66.42 KiB/tok at ub512  ->  ratio 0.877
+   measured   Qwen 29.06 / Llama 33.21 KiB/tok at ub256  ->  ratio 0.875
+   predicted  28/32                                      =        0.875
+
+   Both ubatch settings reproduce the head-count ratio, one of them exactly. The
+   n_kv x n_ubatch x n_head model of the scratch term is confirmed on a second
+   architecture. (Each model also carries a small constant above the pure
+   formula — Llama 66.42 against a predicted 64.0, Qwen 58.25 against 56.0, both
+   about +2.2 KiB/tok — which is why the ratio is 0.877 rather than 0.875 at
+   ub512. The constant is the same size on both models, so it does not scale
+   with heads and is not part of the term being tested.)
+
+2. THE CEILING MOVES AS PREDICTED, AND THE HEADLINE IS BINARY
+   At ub512 Qwen COMPLETES at C=65536 — the configuration at which Llama is
+   refused by the driver — and again at C=98304, failing only at 114688. Its
+   ceiling is bracketed between 98304 and 114688 against a prediction of
+   ~109,000, i.e. the prediction lands inside the measured bracket.
+   At ub256 the ceiling is bracketed between 131072 and 147456 against a
+   prediction of ~145,000, again inside the bracket.
+
+   So the same machine, same runtime and same flags reach a 2.0x higher context
+   ceiling on a model with 0.44x the KV per cell and 0.875x the heads, and the
+   paper's own arithmetic predicts where.
+
+3. THE FAILURE MODE REPLICATES
+   Both refusals are the execution-time Metal refusal, not an allocation
+   failure: they occur at 1.035x and 1.002x of the advisory budget after the
+   context loads successfully, and they take ~1.2 s against ~53 s for a
+   completing run — i.e. they fail on the first ubatch of the prompt. This is
+   Finding 4's mechanism reproduced on a second model: the limit appears at
+   execution, and the boundary sits where the arithmetic says it should.
+
+WHY THIS MATTERS FOR THE PAPER
+-------------------------------
+Finding 4's per-token accounting (193 KiB/token for Llama: 128 KV + 65 scratch)
+currently reads as a measurement of one model. It is a formula, and this is the
+first evidence that it predicts a different model's ceiling rather than merely
+describing the one it was fitted on. That is a stronger claim than the paper
+makes, and it costs one table.
+
+It also sharpens the "why not simply enlarge the cache?" argument: the ceiling
+is not a fixed property of the hardware, it is (budget - model) / (KV + scratch)
+per token, and a model with narrower KV geometry buys context ceiling roughly in
+proportion. On this machine that is the difference between 49k and ~109k tokens
+at the same ubatch.
+
+LIMITS
+------
+- Two ubatch settings on the new model, one on each side of the Llama pair.
+- The ceilings are brackets, not points; the walk steps in 16384-token
+  increments, so "between 98304 and 114688" is as precise as this ladder gets.
+- Qwen's n_ctx_train is 32768, so the large-C runs are far outside the model's
+  trained context. That is irrelevant to a capacity test — the outcome is
+  whether the driver executes the command buffer, not whether the output is
+  sensible — but it means these configurations are not useful operating points
+  and must not be presented as though they were.
+- flash attention off throughout, parsed back per run, matching the spill path
+  and the Llama sweep.
