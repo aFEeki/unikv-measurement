@@ -1,0 +1,180 @@
+The RoPE ablation — Finding 5's mechanism is REAL, and it is NOT most of the gap
+================================================================================
+Run 2026-08-19, 22:20-23:55. Harness: scripts/run_rope_ablation.py
+Data:    stress_results/rope_ablation_block.csv (24 runs)
+Console: artifacts/rope_ablation/block.log    Logs: artifacts/rope_ablation/logs/
+Code:    llama.cpp/src/llama-kv-cache.cpp, llama_kv_cache::update(), the
+         UNIKV_NO_REENCODE gate.
+
+HEADLINE
+--------
+The K-shift re-encode is a real, measurable cost and it scales exactly as the
+"it re-encodes the whole cache" story predicts — 0.92 ms per shift at C=1024 and
+1.81 ms at C=2048, a ratio of 1.96 against a predicted 2.00.
+
+But at C=1024, the budget the paper actually quotes, it accounts for only 35.4%
+of the policy-1-to-H2O gap. Nearly two thirds of that gap is something else.
+
+So Finding 5 names the right mechanism and overstates its share. The sentence
+"the rolling window costs more because llama.cpp re-encodes rotary embeddings
+across the cache" is not wrong about the cause but is wrong about the
+accounting, and at the headline budget it is wrong by a factor of about three.
+
+THE INSTRUMENT
+--------------
+UNIKV_NO_REENCODE=1 gates the K-shift pass inside llama_kv_cache::update():
+
+    if (hparams.rope_type != LLAMA_ROPE_TYPE_NONE && !unikv_no_reencode) {
+        ggml_backend_sched_reset(sched);
+        ... build_graph_shift(); ggml_backend_sched_alloc_graph();
+            res->set_inputs(); lctx->graph_compute();
+    }
+    for (...) cells.reset_shift();     // still runs in BOTH cases
+
+Precisely what is removed: the entire K-shift graph pass — build, allocate, set
+inputs and compute — not merely the rotary arithmetic inside it. What is kept:
+seq_add's position renumbering, the cell scan, the head fix-up, the eviction
+itself and reset_shift(). The difference between the arms is therefore the cost
+of the whole shift pass, and the analysis should say "the K-shift pass" wherever
+it is tempting to say "the rope kernel".
+
+THE ABLATED ARM PRODUCES WRONG OUTPUT, BY CONSTRUCTION. Surviving cells keep
+positions that no longer match their rotary encoding. This is an instrument, not
+a policy, and none of its text is reported as a quality result.
+
+INSTRUMENT VALIDATION (before the block, artifacts/rope_ablation/, /tmp probes)
+  - the banner "RoPE re-encode SKIPPED" appears in the ablated arm's own log and
+    in no other arm's: asserted per run in BOTH directions by the harness, 6/6
+    and 18/18 across the block, zero flags.
+  - with a 512-token prompt at C=1024 the ablated arm's sampled token ids are
+    IDENTICAL to the normal arm's through index 514 and first differ at index
+    515 — exactly the first cache overflow (512 prompt + 512 generated = 1024).
+    Before any shift the two are the same computation; from the first shift they
+    diverge. That is the signature of a gate that touches the shift path and
+    nothing else.
+  - the default path is provably untouched: the flag defaults false and the
+    condition is `&& !unikv_no_reencode`.
+
+  (A first smoke test of mine was invalid and is recorded here so the validation
+  is not overstated: 512 prompt + 64 generated at C=1024 never fills the cache,
+  so no shift occurs, and the "difference" I first saw was timing jitter in raw
+  stderr. The check above forces overflow and compares token ids.)
+
+PROTOCOL
+--------
+Randomised COMPLETE block: three rounds, each a random permutation of all eight
+(arm, ctx) cells, so every arm appears exactly once per third of the session and
+arm is orthogonal to block position BY CONSTRUCTION rather than by a lucky
+shuffle. Position audit, mean slot: p0 11.67, p1 13.50, p1_noreencode 13.50,
+p4 11.33 — balanced, as the design guarantees.
+
+512-token prompt, 2048 decode, C in {1024, 2048}, -b/-ub 512, -fa off parsed
+back as "disabled" on all 24 runs, greedy, seed 123, EOS disabled,
+uninstrumented, 200 s cooldowns. All rc=0. p1, p1_noreencode and p4 decoded the
+full 2048 at both budgets; p0 decoded 512 at C=1024 and 1536 at C=2048, which is
+the halting policy behaving as designed. No exclusions, no flags.
+
+RESULTS
+-------
+  C=1024                            mean tok/s   SE     sd
+    p0_upstream (halts)               42.850   0.032  0.055
+    p1_window   (K-shift as shipped)  38.860   0.011  0.019
+    p1_noreencode (INSTRUMENT)        39.935   0.006  0.010
+    p4_h2o                            41.899   0.023  0.040
+
+  C=2048
+    p0_upstream (halts)               40.977   0.006  0.010
+    p1_window                         38.843   0.011  0.019
+    p1_noreencode (INSTRUMENT)        39.538   0.017  0.030
+    p4_h2o                            39.631   0.006  0.011
+
+THE PREDICTION, AND HOW IT LANDED
+-----------------------------------
+Predicted from the cooled b2 block at C=1024: p1 39.40, H2O 42.42, gap 3.02
+(7.7%). If the attribution is right, the ablated arm should recover most of that
+gap and land near H2O.
+
+  measured gap at C=1024: 3.038 tok/s — the gap REPLICATES almost exactly
+  (3.038 against the predicted 3.02), while both levels sit ~0.5 tok/s below the
+  earlier block, a consistent block offset that cancels in the contrast.
+
+  recovered by the ablation: +1.074 tok/s = 35.4% of the gap
+  residual to H2O:           +1.964 tok/s = 64.6% of the gap
+
+The ablated arm does NOT land near H2O. It lands about a third of the way there.
+
+  C=1024:  p1 38.860  ->  ablated 39.935  ->  H2O 41.899      35.4% recovered
+  C=2048:  p1 38.843  ->  ablated 39.538  ->  H2O 39.631      88.3% recovered
+
+THE 35% / 88% SPLIT IS NOT A CHANGE IN THE MECHANISM'S IMPORTANCE
+-------------------------------------------------------------------
+It is tempting to read C=2048's 88.3% as the mechanism mattering more at larger
+budgets. It does not. The re-encode's absolute cost FALLS between the two
+budgets (1.074 -> 0.695 tok/s) while the denominator falls faster, because H2O
+slows down and policy 1 does not:
+
+    p1  38.860 -> 38.843   (flat; its cost is dominated by the shift, and the
+                            shift happens on fewer steps at the larger C but
+                            costs proportionally more per shift)
+    H2O 41.899 -> 39.631   (slower: a 2048-cell cache is more attention work)
+
+so the gap collapses from 3.038 to 0.787 and the same-sized effect fills more of
+it. The percentage-of-gap statistic is a ratio of two quantities that scale
+differently and should not be quoted as a property of the mechanism.
+
+WHAT SCALES CORRECTLY, AND CONFIRMS THE MECHANISM'S IDENTITY
+--------------------------------------------------------------
+The per-shift cost is the quantity the "re-encodes the whole cache" story makes
+a prediction about, and it is measured here for the first time. The number of
+shifting steps is derived, not measured — the block is uninstrumented, and
+UNIKV_LOG's shift_events column would have drained the pipeline. After the cache
+fills, policy 1 evicts one cell per decode step, so every subsequent step shifts:
+
+    C=1024: fills at generated token  512  ->  1536 of 2048 steps shift
+    C=2048: fills at generated token 1536  ->   512 of 2048 steps shift
+
+      C     shifting   p1 ms/tok  ablated  delta ms/tok  total ms  ms per shift
+    1024        1536      25.733   25.041         0.692    1417.8         0.923
+    2048         512      25.744   25.292         0.453     926.8         1.810
+
+    per-shift cost ratio (C=2048 / C=1024) = 1.961
+    predicted by "it re-encodes the whole cache" = 2.000
+
+A 2x cache costs 1.96x per shift. The K-shift pass is linear in cache size, to
+within 2%. That is a direct, quantitative confirmation that the operation
+Finding 5 names is the operation being measured — and it is a stronger result
+than the gap-fraction, because it tests the mechanism's SHAPE rather than its
+share.
+
+WHAT THE PAPER SHOULD SAY
+--------------------------
+Both halves, not just the first:
+
+  "The rolling window pays a K-shift on every overflow, and that pass is linear
+  in the resident cache: 0.92 ms per shift at C=1024 and 1.81 ms at C=2048, a
+  ratio of 1.96 against the 2.00 that re-encoding the whole cache predicts.
+  Ablating the pass recovers 1.07 tok/s of the 3.04 tok/s gap to H2O at C=1024
+  (35%) and 0.70 of 0.79 at C=2048 (88%). The re-encode is therefore a
+  confirmed mechanism but not the whole explanation at the smaller budget, where
+  most of the gap remains unattributed."
+
+The remaining 1.96 tok/s at C=1024 is NOT identified by this experiment and the
+paper should not guess at it in print. Candidates that this block cannot
+separate: seq_add's O(cache) scan on every shifting step; the slot search and
+cell fragmentation that follow repeated renumbering; and the difference in how
+the two policies leave the cache laid out for the next attention pass. Isolating
+them needs another instrument, not another block.
+
+LIMITS
+------
+- One model, one machine, one prompt length, two budgets, three trials.
+- The shifting-step counts are derived from the eviction rule and the geometry,
+  not measured, because the block is uninstrumented by protocol. The per-shift
+  figures inherit that. The derivation is arithmetic (cache fills at C - prompt
+  generated tokens, one eviction per step thereafter), but it is a derivation.
+- The ablation removes the whole K-shift pass, so "0.92 ms per shift" is the
+  cost of the pass including graph build and allocation, not of the rotary
+  arithmetic alone. A finer instrument could split those.
+- The ablated arm's output is invalid by construction and is never a quality
+  result. Its throughput is meaningful only as the counterfactual "policy 1
+  without this pass".

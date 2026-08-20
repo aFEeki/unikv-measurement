@@ -1,0 +1,144 @@
+The composed fused-kernel cost — one block, so the paper need not decline
+================================================================================
+Run 2026-08-19 23:58 - 2026-08-20 01:55. Harness: scripts/run_fused_composed.py
+Data:    stress_results/fused_composed_block.csv (24 runs + 2 preflight)
+Console: artifacts/fused_composed/block.log   Logs: artifacts/fused_composed/logs/
+
+WHY THIS BLOCK EXISTS
+---------------------
+Section 8 gives the exactness premium (11.4% over H2O at C=1024) and Section 3
+gives the fused-kernel penalty (12.4% at C=4096) from DIFFERENT blocks, and the
+paper declines to compose them because that is exactly the splice Section 6
+refuses on its own data. All four arms in one cooled block removes the need to
+decline.
+
+PREFLIGHT — recorded, not asserted
+------------------------------------
+The paper states that policy 3 cannot use the fused kernel. Rather than assert it
+from the source, the harness tries it and records what happens:
+
+  policy 3 device-visible, -fa on : rc=1, flash_attn=enabled, decoded=None
+                                    "failed to create context with model"
+  policy 4 H2O,            -fa on : rc=1, flash_attn=enabled, decoded=None
+                                    "failed to create context with model"
+
+Both REFUSE TO CONSTRUCT. Note the runtime reports flash_attn=enabled before
+failing, i.e. the refusal is ours at context construction, not the backend
+declining the kernel. This is why the composition below is necessary at all:
+there is no way to measure either policy against itself with the fused kernel.
+
+PROTOCOL
+--------
+Randomised COMPLETE block: three rounds, each a random permutation of all eight
+(arm, ctx) cells, so arm is orthogonal to block position by construction.
+Position audit, mean slot: p0_fa_on 10.67, p0_fa_off 12.17, p4_h2o 13.83,
+p3_dev 13.33.
+
+512-token prompt, 2048 decode budget, C in {1024, 2048}, -b/-ub 512, greedy,
+seed 123, EOS disabled, uninstrumented, 200 s cooldowns. flash_attn parsed back
+from every run's own log and asserted against what the arm requested: "enabled"
+on all six p0_fa_on runs, "disabled" on the other eighteen. All rc=0. No
+exclusions, no flags.
+
+RESULTS
+-------
+  C=1024                      mean tok/s    SE      sd    decoded
+    p0_fa_on   (fused)          46.624   0.069   0.119      512
+    p0_fa_off                   42.842   0.008   0.013      512
+    p4_h2o                      41.869   0.005   0.009     2048
+    p3_dev                      37.626   0.014   0.025     2048
+
+  C=2048
+    p0_fa_on   (fused)          45.989   0.021   0.037     1536
+    p0_fa_off                   40.967   0.005   0.009     1536
+    p4_h2o                      39.635   0.009   0.015     2048
+    p3_dev                      39.119   0.015   0.025     2048
+
+(a) THE KERNEL PENALTY AT THESE BUDGETS — IT DOES NOT CARRY DOWN
+-----------------------------------------------------------------
+Same policy, same halting behaviour, same decoded length, only the kernel
+differs. This is the clean contrast and the brief asked for it explicitly
+because the published 12.4% is from C=4096.
+
+    C=1024:  46.624 vs 42.842  ->  fused is  +8.83% faster
+    C=2048:  45.989 vs 40.967  ->  fused is +12.26% faster
+    C=4096:  published                       +12.4%
+
+The penalty is essentially unchanged from C=2048 to C=4096 (12.26% vs 12.4%) and
+markedly SMALLER at C=1024 (8.83%, about 30% less). So the published figure
+carries at C=2048 and above and must not be quoted at C=1024. That is the
+expected direction — with the explicit softmax the materialised KQ matrix scales
+with the resident cache, so its relative cost grows with C and saturates once it
+dominates — but it was previously assumed rather than measured at the small
+budget where the paper's headline comparisons live.
+
+(b) THE EXACTNESS PREMIUM — REPLICATES TO 0.15 PERCENTAGE POINTS
+------------------------------------------------------------------
+Both arms -fa off, same block, both decoding the full 2048.
+
+    C=1024:  p3_dev 37.626 vs h2o 41.869  ->  +11.28%
+             (b2 block: +11.42%   paper: 11.4%)
+    C=2048:  p3_dev 39.119 vs h2o 39.635  ->   +1.32%
+             (b2 block: +1.33%)
+
+An independent cooled block reproduces both published premia to within 0.15 and
+0.01 percentage points. Section 8's numbers are solid.
+
+(c) THE COMPOSED NUMBER — WHAT EXACT RETENTION COSTS AGAINST A FUSED BASELINE
+------------------------------------------------------------------------------
+Two routes, and they are not equivalent.
+
+  DIRECT (p3_dev vs p0_fa_on):      C=1024 +23.91%    C=2048 +17.56%
+  COMPOSED (premium x penalty):     C=1024 +21.10%    C=2048 +13.74%
+
+THE DIRECT ROUTE IS AN UPPER BOUND AND SHOULD BE LABELLED ONE. Policy 0 halts at
+cache-full: at C=1024 it decodes 512 tokens and stops, at C=2048 it decodes 1536,
+while p3_dev decodes the full 2048. So the baseline is timed only over the
+regime where the cache is not yet full, the KV is small and no spilled tier
+exists — the cheapest part of the run — while the retention arm is timed over a
+regime that includes recall from the spilled tier. The decoded counts are in the
+CSV per run so this is visible rather than buried.
+
+The gap between the routes is not a modelling choice; it is exactly one
+measurable quantity. Direct / composed equals p0_fa_off / p4_h2o, to six decimal
+places, at both budgets:
+
+    C=1024:  1.0232 = 1.0232        C=2048:  1.0336 = 1.0336
+
+i.e. the two routes differ by precisely the amount that upstream-while-halting
+outruns H2O-while-completing (2.3% and 3.4%). That is the halting artifact,
+isolated and quantified, and it is the reason to prefer the composed route.
+
+THE COMPOSED ROUTE'S OWN ASSUMPTION, STATED PLAINLY: it multiplies the premium
+over H2O by the kernel penalty measured ON POLICY 0, because neither H2O nor
+policy 3 can run the fused kernel at all (see PREFLIGHT). It therefore assumes
+the kernel penalty transfers from a non-evicting policy to an evicting one. That
+assumption is unavoidable given the refusal and it is not tested here. It is
+weaker than a splice across blocks — everything is measured in this one block —
+but it is not free.
+
+WHAT THE PAPER CAN NOW STATE
+-----------------------------
+"Within a single cooled block, exact retention on the device-visible tier costs
+21.1% against an upstream baseline running the fused kernel at C=1024, and 13.7%
+at C=2048, composing an 11.3% premium over H2O with an 8.8% kernel penalty
+measured on the same policy in the same block. A direct comparison against
+upstream-with-fusion gives 23.9% and 17.6%, but upstream halts at cache-full and
+is therefore timed only over the not-yet-full regime; the difference between the
+two figures is exactly the margin by which halting upstream outruns completing
+H2O."
+
+That is the number the paper currently cannot state, and it no longer requires
+the splice Section 6 refuses.
+
+LIMITS
+------
+- One model, one machine, one prompt length, two budgets, three trials.
+- The composed route assumes the fused-kernel penalty transfers across policies.
+  Untestable here because policies 3 and 4 refuse to construct with -fa on; a
+  fused-compatible eviction policy would be needed to check it.
+- The direct route's halting asymmetry is quantified above but not removed. A
+  baseline that completes 2048 tokens with the fused kernel does not exist in
+  this fork, which is the whole difficulty.
+- All figures are throughput ratios on a 512-token prompt. They are not claims
+  about long-context behaviour.

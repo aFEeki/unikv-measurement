@@ -582,3 +582,132 @@ size on a quiet machine, so it is a property of the CPU-pinned tier. It also
 makes the Qwen CPU-pinned coefficients imprecise (slope SE 0.4135 vs
 device-visible's 0.0058), which is why every CPU-pinned claim above is reported
 on both estimators and none rests on a difference between them.
+
+---
+
+# Three unrun experiments — 2026-08-19/20
+
+| item | status | result | data | analysis |
+|---|---|---|---|---|
+| 1. RoPE ablation | done | Mechanism **confirmed and quantified**, but it is only **35%** of the gap at C=1024 | `stress_results/rope_ablation_block.csv` | `artifacts/rope_ablation/rope_ablation_analysis.txt` |
+| 2. Composed fused-kernel cost | done | **+21.1%** at C=1024 in one block; published 12.4% kernel penalty **does not carry down** | `stress_results/fused_composed_block.csv` | `artifacts/fused_composed/fused_composed_analysis.txt` |
+| 3. Constant-work thermal control | done | Drift is real but **near-constant across targets** — it sits in γ, not δ. δ residual **2.3% / −0.1%**, inside the 6% bound | `stress_results/thermal_control_block.csv` | `artifacts/thermal_control/thermal_control_analysis.txt` |
+
+New code: `UNIKV_NO_REENCODE=1` in `llama_kv_cache::update()` (llama-kv-cache.cpp)
+gates the K-shift pass. Off by default; the default path is unchanged.
+
+## Item 1 — Finding 5 names the right mechanism and overstates its share
+
+| C | p1 | p1 ablated | H2O | gap | recovered |
+|---|---|---|---|---|---|
+| 1024 | 38.860 | 39.935 | 41.899 | +3.038 | **+1.074 = 35.4%** |
+| 2048 | 38.843 | 39.538 | 39.631 | +0.787 | +0.695 = 88.3% |
+
+The predicted gap replicated (3.038 vs 3.02 predicted). But the ablated arm lands
+about a third of the way to H2O at C=1024, leaving **1.96 tok/s unattributed** at
+the budget the paper quotes.
+
+**Do not read C=2048's 88% as the mechanism mattering more.** The re-encode's
+absolute cost *falls* (1.074 → 0.695); the denominator falls faster because H2O
+slows (41.90 → 39.63) while policy 1 stays flat (38.86 → 38.84). The
+percentage-of-gap is a ratio of two differently-scaling quantities.
+
+**What does scale correctly is the stronger result.** Per shift event the K-shift
+pass costs **0.923 ms at C=1024 and 1.810 ms at C=2048 — ratio 1.961 against the
+2.000 that "re-encodes the whole cache" predicts.** Linear in cache size to
+within 2%: the operation Finding 5 names is the operation being measured.
+
+Suggested claim: *the K-shift pass is linear in the resident cache (0.92 ms and
+1.81 ms per shift at C=1024/2048, ratio 1.96 vs a predicted 2.00); ablating it
+recovers 35% of the gap to H2O at C=1024 and 88% at C=2048, so it is a confirmed
+mechanism but not the whole explanation at the smaller budget.*
+
+Two precisions: the gate removes the **entire K-shift pass** (build, allocate,
+set-inputs, compute), not just rotary arithmetic; and the shifting-step counts
+(1536, 512) are **derived** from the eviction rule, not measured, since the block
+is uninstrumented by protocol. The residual 1.96 tok/s is **not identified** —
+candidates (seq_add's O(cache) scan, fragmentation, cache layout) need another
+instrument, not another block.
+
+Instrument validation: ablated tokens identical to normal through index 514,
+first differ at **515** = the first overflow. Banner present 6/6 on ablation runs,
+absent 18/18 elsewhere. Zero flags.
+
+## Item 2 — the composed number, and a published figure that does not carry
+
+**Preflight, recorded not asserted:** policies 3 and 4 both **refuse to construct**
+with `-fa on` (rc=1, "unable to create context"), which is why a composition is
+needed at all.
+
+**(a) Kernel penalty at these budgets** — same policy, same halting, same decoded
+length:
+
+| C | fused advantage |
+|---|---|
+| 1024 | **+8.83%** |
+| 2048 | +12.26% |
+| 4096 | +12.4% (published) |
+
+The published figure holds at C=2048 and above and is ~30% too large at C=1024.
+**It must not be quoted at the small budget where the headline comparisons live.**
+
+**(b) Exactness premium replicates to 0.15 pp**: +11.28% at C=1024 (b2: +11.42%,
+paper: 11.4%) and +1.32% at C=2048 (b2: +1.33%).
+
+**(c) Composed**: **+21.1% at C=1024**, +13.7% at C=2048 (premium × penalty, all
+in one block). A direct p3_dev-vs-p0_fa_on comparison gives +23.9% / +17.6% but
+is an **upper bound** — policy 0 halts at cache-full and is timed only over the
+not-yet-full regime. The two routes differ by *exactly* `p0_fa_off / p4_h2o`
+(1.0232 and 1.0336, matching to six decimals): the halting artifact, isolated.
+
+**The composed route's own assumption**, stated plainly: it applies a kernel
+penalty measured on policy 0 to an evicting policy, because neither H2O nor
+policy 3 can run the fused kernel. Unavoidable given the refusal, untested here.
+
+## Item 3 — the bound becomes a measurement, and the heat is in γ not δ
+
+72 runs, 3 complete rounds, zero flags. **Thermal drift is real** — a
+constant-work burst slows by up to **1.16 ms on a 25.7 ms step** (4.5%) at the
+longest timeline, so a cooled block is *not* thermally flat within a run. But the
+drift is **near-constant across spill targets**, not proportional to n_spill: half
+the CPU-pinned drift is already present at target 512, then it rises slowly and
+non-monotonically. A near-constant offset moves the intercept of a fit against
+n_spill and leaves the slope alone.
+
+| | δ raw | δ corrected | thermal share |
+|---|---|---|---|
+| CPU-pinned | 3.1555 | **3.0840** µs/cell | **2.27%** |
+| device-visible | 2.1945 | **2.1965** µs/cell | **−0.09%** |
+
+Both inside the ~6% the arithmetic bounded the residual at. **The bound was
+correct in direction and conservative in size; the per-cell terms can now be
+reported as estimates.**
+
+| | γ raw | γ corrected | change |
+|---|---|---|---|
+| CPU-pinned | 9.032 | 8.493 ms | −6.0% |
+| device-visible | 2.718 | **2.152 ms** | **−20.8%** |
+
+**That is where the heat was.** The device-visible γ reduction *strengthens* from
+69.9% to **74.7%** — correcting for drift makes the device-visible tier look
+better on the fixed term, because a ~0.57 ms offset is a fifth of a γ that small.
+
+**Design departures, both deliberate.** (a) Matched on **elapsed wall-clock, not
+burst duration**: the bursts are only 2.17–5.51 s and barely differ, while process
+durations run 4.7–94.3 s because prefill dominates — at CPU-pinned n=8192, ~89 of
+94 s precede the window. Burst-matching would have controlled almost none of the
+heat. (b) **The isochronal arms were re-run in this block**, since correcting the
+published block with a new control is exactly the forbidden cross-block
+subtraction; correction is paired within round. Control prompt is 1000 tokens, not
+512, so the earliest band (2.5 s) sits in the constant-work regime — a 512-token
+prompt would have silently broken the control.
+
+**Cost of the correction, stated:** it imports the control's sampling error. Slope
+SE rises 0.0633 → 0.0723 (+14%) CPU-pinned and 0.0091 → 0.0165 (+82%)
+device-visible. Better centred, worse determined; report both. Slopes remain
+separable (t = 11.96 corrected, 15.03 raw).
+
+**Bonus — independent replication.** Re-running the isochronal arms reproduces the
+published block three weeks later: δ 3.1555 vs 3.0990 and 2.1945 vs 2.1531, γ
+9.032 vs 8.762 and 2.718 vs 2.708, and the δ reduction **30.5% vs 30.5% exactly**.
+Finding 1's numbers are solid.
