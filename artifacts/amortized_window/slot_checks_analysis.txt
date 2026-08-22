@@ -1,0 +1,143 @@
+Slot-effect audit — the M1 block's episode, and the published ablation block
+================================================================================
+2026-08-21. NO NEW RUNS. Generator: scripts/check_slot_effects.py, implementing
+the three checks the threats section establishes for the drain block's bad draw:
+residual throughput regressed on execution slot, strictly local adjacent-slot
+contrasts (immune to any monotone drift), and detrended cell means.
+Sources: stress_results/amortized_window_block.csv,
+         stress_results/rope_ablation_block.csv,
+         stress_results/amortized_window_recheck{,_c2048}.csv
+
+ITEM 1 — DOES THE EPISODE THREATEN THE HEADLINE MARGIN? NO.
+-------------------------------------------------------------
+The episode: slots 19-24 of the M1 block are all depressed (mean -0.261 tok/s,
+worst -0.531) while slots 1-18 are all at or above their cell means (+0.087).
+It is a STEP at slot 19, not a ramp.
+
+  p1_amortized - p4_h2o, C=1024
+    DRIFT      -0.0272 +/- 0.0067 tok/s per slot (t = -4.09, real)
+    RAW        +0.667 +/- 0.099 tok/s
+    DETRENDED  +0.667          (shift +0.000)
+    LOCAL      +0.677 +/- 0.025 (shift +0.010)
+  p1_amortized - p4_h2o, C=2048
+    DRIFT      -0.0077 +/- 0.0034 tok/s per slot (t = -2.27)
+    RAW        +0.711 +/- 0.056 tok/s
+    DETRENDED  +0.742          (shift +0.031)
+    LOCAL      +0.728 +/- 0.026 (shift +0.017)
+
+All three agree with raw within its uncertainty and the sign is never at risk, so
+by the stated decision rule THE FINDING STANDS AS MEASURED and no re-run is
+needed.
+
+WHY the drift cancels: the randomised COMPLETE block gave p1_amortized a mean
+slot of 12.00 and p4_h2o a mean slot of 12.00 — identical. Detrending therefore
+shifts the C=1024 contrast by exactly 0.000. This is the complete-block design
+doing the job the drain block's plain shuffle failed to do; it is worth noting
+that the protection was structural rather than lucky.
+
+A FOURTH CHECK, BECAUSE THE THREE ASSUME MONOTONE DRIFT AND THIS IS A STEP
+---------------------------------------------------------------------------
+Detrending and local interpolation both model a ramp. A step at slot 19 is not a
+ramp, and local interpolation across it actively over-corrects: it propagates
+slot 22's depression backwards to slot 19. So the episode was also handled the
+way a step should be — by excluding it.
+
+  C=1024, pre-episode (slots < 19) vs all slots
+    p1_amortized  42.513 vs 42.433   (+0.079)
+    p1_window     38.795 vs 38.530   (+0.265)
+    p4_h2o        41.824 vs 41.766   (+0.057)
+
+  VALIDATION: pre-episode p1_window is 38.795 against the independent six-trial
+  recheck's 38.792 — a difference of 0.009%. The exclusion reproduces a
+  separately measured value on a different day, which is the strongest evidence
+  available that it removes the episode rather than trimming to taste.
+
+CONSEQUENCE FOR THE TWO CLAIMS
+--------------------------------
+  amortized over the per-token window, C=1024:  +10.13% raw -> +9.58% corrected
+  amortized over the per-token window, C=2048:   +3.80% raw ->  +3.94% corrected
+  amortized over H2O,                 C=1024:   +1.60% raw ->  +1.65% corrected
+  amortized over H2O,                 C=2048:   +1.80% raw ->  +1.94% corrected
+
+THE +10.13% WAS AN OVERESTIMATE, as suspected, because the episode hit the
+p1_window arm's slot-22 run (-0.80 from its own cell) far harder than it hit the
+p1_amortized arm's slot-19 run (-0.24). The corrected figure is +9.58%.
+
+The H2O margin is robust and if anything slightly larger after correction:
++0.667 raw, +0.677 local, +0.689 pre-episode. Four estimators, same sign, spread
+of 0.022 tok/s.
+
+ITEM 2 — WAS THE PUBLISHED ABLATION BLOCK SLOT-AFFECTED? NO.
+--------------------------------------------------------------
+  p1_noreencode - p1_window, rope_ablation_block.csv
+    C=1024  DRIFT -0.0013 +/- 0.0010 (t = -1.31, not significant)
+            RAW +1.074 +/- 0.012   DETRENDED +1.075   LOCAL +1.074 +/- 0.005
+    C=2048  DRIFT +0.0002 +/- 0.0008 (t = +0.28, not significant)
+            RAW +0.695 +/- 0.020   DETRENDED +0.695   LOCAL +0.699 +/- 0.012
+
+  per-event and ratio, all three ways:
+    published (raw)   0.924 ms   1.814 ms   ratio 1.964
+    detrended         0.924 ms   1.814 ms   ratio 1.963
+    local             0.923 ms   1.823 ms   ratio 1.975
+
+That block had no slot problem. Its numbers are what it measured.
+
+SO THE TWO BLOCKS DISAGREE ON THE RATIO — BUT NOT SIGNIFICANTLY
+-----------------------------------------------------------------
+  per-event, 95% intervals            C=1024                C=2048
+    published block            0.924 [0.902, 0.945]   1.814 [1.710, 1.917]
+    recheck, n=6, new binary   0.937 [0.914, 0.959]   1.722 [1.670, 1.775]
+
+    ratio, published block     1.964  95% CI [1.844, 2.085]  contains 2.000: YES
+    ratio, recheck             1.839  95% CI [1.768, 1.911]  contains 2.000: NO
+    difference of the ratios   +0.125 95% CI [-0.015, +0.266] -> CONTAINS ZERO
+
+  recovery, compared directly:
+    C=1024  published +1.074 +/- 0.012  recheck +1.086 +/- 0.013  t = -0.66
+    C=2048  published +0.695 +/- 0.020  recheck +0.660 +/- 0.010  t = +1.53
+
+The two blocks AGREE on recovery at both budgets and their ratios are not
+significantly different. What has changed is not the measurement but its apparent
+precision: the published block's ratio of 1.964 looked like clean support for
+2.000, and its own 95% interval is [1.844, 2.085] — wide enough that it never
+excluded 1.85 either. The recheck's tighter interval excludes 2.000, but only
+just, at an upper bound of 1.911.
+
+THE HONEST CONCLUSION IS NOT "THE LINEARITY RESULT FAILED TO REPLICATE". It is
+that neither block has the precision to settle linearity, and Section 8 presents
+a point estimate as though it did. The supportable statement is that the
+per-event cost roughly doubles when the resident cache doubles — measured at
+1.84 and 1.96 in two blocks whose intervals overlap and straddle 2.000 — not
+that it is 1.961 against a predicted 2.000.
+
+RECONSTRUCTION VERDICT UNDER THE INTERVAL RULE — READ IT BOTH WAYS
+--------------------------------------------------------------------
+The rule as stated: pass if the block's 95% interval on per-event cost contains
+the published value at both budgets. C=1024 contains 0.923 (pass). C=2048's
+interval [1.670, 1.775] does NOT contain the published 1.814, with tight bars.
+BY THE LETTER OF THE RULE, THIS FAILS.
+
+The symmetric reading disagrees, and the difference is not cosmetic: the rule
+compares a new interval against an OLD POINT, treating 1.814 as exact when it is
+itself an estimate with interval [1.710, 1.917]. The two intervals overlap over
+[1.710, 1.775], the difference of the two ratios contains zero, and the recovery
+statistics agree at t = -0.66 and t = +1.53.
+
+The reconstruction is therefore consistent with the original instrument on every
+symmetric test, and fails only a test that gives the original block's estimate
+zero uncertainty. That judgement is the author's to make, which is why the commit
+is being held rather than taken.
+
+LIMITS
+------
+- The episode's cause is not identified. The unified log is not queryable in this
+  environment, so machine idleness during the M1 block cannot be verified. What
+  is established is that it is confined to slots 19-24, that it is a step, and
+  that excluding it reproduces an independently measured value to 0.009%.
+- The pre-episode means at C=1024 rest on n=2 per arm. They are corroborated by
+  the six-trial recheck for p1_window only; p1_amortized and p4_h2o have no
+  independent re-measurement.
+- Ratios of per-event costs amplify the uncertainty of two small differences of
+  large numbers. That is why both blocks' intervals are wide despite tight
+  per-arm standard errors, and it is the reason the linearity claim cannot be
+  settled at this sample size rather than a defect of either block.

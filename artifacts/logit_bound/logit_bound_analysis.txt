@@ -1,0 +1,195 @@
+Review item M2 — exact retention is NOT bit-exact. DA-1 was right.
+================================================================================
+Run 2026-08-21. Harnesses: scripts/run_logit_bound.py (main),
+                           scripts/run_logit_controls.py (controls)
+Data:    quality_results/logit_bound.csv, raw float32 dumps in
+         artifacts/logit_bound/*.bin
+Console: artifacts/logit_bound/run.log
+Code:    UNIKV_LOGIT_LOG in tools/completion/completion.cpp — dumps the RAW model
+         logits for every sampled step, before the sampler touches them.
+
+HEADLINE
+--------
+Over the 512-token horizon, exact retention reproduces the no-eviction
+reference's TOKEN stream perfectly (512/512, both prompts, both tiers) while its
+LOGITS differ by up to 2.18. Not one step out of 512 is bit-identical on either
+tier. The recommendation the paper makes is empirically true and structurally
+unguaranteed, and the difference matters.
+
+  max |delta logit| vs the C=8192 no-eviction reference
+                          passkey     prose     steps bit-identical   tokens
+    p3_dev  (C=1024)       0.1726    0.2806            0/512         512/512
+    p3_cpu  (C=1024)       1.9920    2.1843            0/512         512/512
+    p4_h2o  (C=1024)      33.4892   45.1159            0/512    30/512, 164/512
+
+THE CONFOUND, RULED OUT BEFORE ANYTHING WAS CONCLUDED
+------------------------------------------------------
+The reference runs at C=8192 and the retention arms at C=1024. Those differ in
+two ways at once: the spill mechanism, and the size of the attention window,
+which changes the shape of the reduction and hence float summation order.
+Non-associativity alone could have produced the whole effect. Two controls:
+
+  A. DETERMINISM. policy 0, C=8192, run twice with identical settings:
+     max |delta| = 0 over 64 steps, 64/64 bit-identical. The runtime is
+     deterministic, so every delta below is signal.
+
+  B. GRAPH SHAPE. policy 0 at C=8192 vs policy 0 at C=4096, NO SPILL ANYWHERE,
+     compared over the 262 generated tokens before C=4096 fills:
+     max |delta| = 0, 262/262 bit-identical.
+
+     Cache size alone does NOT move the logits on this runtime. The floor is
+     exactly zero, so the deltas above are attributable to the spill-and-recall
+     path and not to reduction-order differences. This was the result that could
+     have invalidated the whole measurement, and it did not.
+
+  C. TIER. policy 3 CPU-pinned vs policy 3 device-visible, both C=1024, same
+     spilled set: max |delta| = 2.035. The two tiers differ from EACH OTHER by
+     about as much as the CPU-pinned tier differs from the reference.
+
+MECHANISM
+---------
+The ordering is consistent and has an obvious cause. The device-visible tier
+keeps the recall on Metal and lands 0.17-0.28 from the reference. The CPU-pinned
+tier is 11.5x further out at 1.99-2.18, and it is the arm that computes part of
+attention on the CPU — the two pins in build_attn_mha_unikv that policy 3
+requires when the spilled tier is host-resident. A different backend for part of
+the reduction is a different summation order and a different intermediate
+precision, so its arithmetic cannot match an all-Metal reference.
+
+"Exact" was always a claim about the DATA — spilled K/V are recalled, not
+approximated, and that remains true. It was never a claim about the arithmetic,
+and the paper has been reading it as though it were.
+
+HOW CLOSE DID TOKEN IDENTITY COME TO BREAKING? — SPLIT BY TIER
+----------------------------------------------------------------
+Pooling the two tiers could not answer this, and the split changes the
+conclusion. Per step, m is the REFERENCE's top1-top2 margin and eps is the arm's
+max |delta logit| at that step. m <= 2*eps is the conservative flip condition: a
+perturbation of size eps applied adversarially to both the winner and the
+runner-up closes a margin of 2*eps.
+
+  prompt   arm         max eps   min(m - 2 eps)   steps m<=2eps   actual flips
+  passkey  p3_cpu       1.9920      -0.04647            6              0
+  passkey  p3_dev       0.1726      -0.03500            1              0
+  prose    p3_cpu       2.1843      -0.02535            2              0
+  prose    p3_dev       0.2806      -0.00711            1              0
+
+  reference top1-top2 margin: passkey min 0.00879 (median 9.52)
+                              prose   min 0.00108 (median 7.23)
+
+DEVICE-VISIBLE IS NOT THE SAFER TIER. It is the less-perturbed tier, and those
+are different claims. Its worst-case slack is -0.0350 against the CPU-pinned
+tier's -0.0465 on the passkey prompt — the same order of magnitude — even though
+its perturbation is 11.5x smaller. It has fewer at-risk steps (1 against 6 and 2),
+which is a real but modest advantage, and on the prose prompt the counts are 1
+against 2.
+
+The reason is that the at-risk steps are not selected by perturbation size. They
+are the steps where the REFERENCE is itself nearly tied: the minimum reference
+margin is 0.00879 and 0.00108, against medians of 9.52 and 7.23. When the model
+is that close to indifferent between two tokens, a perturbation of almost any
+size puts the step at risk, and the tier's advantage in magnitude buys very
+little. The binding constraint is the reference's own margin distribution, not
+the tier.
+
+So the honest move is to DOWNGRADE BOTH TIERS rather than recommend one. Neither
+is bit-exact, both have steps where a flip is not excluded by the arithmetic, and
+the device-visible tier's advantage is in how often that happens rather than in
+how close the worst case comes.
+
+DOES eps GROW WITH STEP INDEX? — AND WHICH STATISTIC
+------------------------------------------------------
+Free from the existing dumps; no new arms. THE QUARTILE FIGURES ARE MEANS
+(analyze_logit_margins.py uses x.mean()). That matters, because eps is itself
+heavy-tailed and the mean and the median tell different stories:
+
+  passkey p3_cpu    Q1        Q2        Q3        Q4      trend
+    mean          0.02872   0.03611   0.05052   0.08450   2.94x
+    median        0.02314   0.02045   0.02203   0.03337   1.44x
+    max           0.18642   0.38751   0.66074   1.99196
+    max/median       8.1x     18.9x     30.0x     59.7x   7.4x
+
+  passkey p3_dev
+    mean          0.01270   0.01106   0.01162   0.01112   0.88x
+    median        0.01049   0.00716   0.00827   0.00863   0.82x
+    max/median       3.0x     24.1x     10.1x      9.4x   no trend
+
+  prose   p3_cpu
+    mean          0.01912   0.05320   0.04614   0.04136   2.16x
+    median        0.01390   0.01689   0.01847   0.01877   1.35x
+    max/median      13.1x    129.3x     39.4x     48.4x   no trend
+
+  prose   p3_dev
+    mean          0.00742   0.00900   0.00739   0.00780   1.05x
+    median        0.00465   0.00446   0.00491   0.00425   0.91x
+    max/median      21.2x     62.9x     12.0x     23.2x   no trend
+
+THE CORRECTED READING. What grows on the CPU-pinned tier is the TAIL, not the
+body. Its median eps rises only 1.44x across the horizon on passkey and 1.35x on
+prose, while its max/median ratio rises 8.1x -> 59.7x on passkey. The 2.94x
+"growth" reported from the means is that tail pulling the mean, not the typical
+step getting worse. On prose the tail ratio has no trend at all, so even the tail
+growth is one prompt out of two.
+
+THE DEVICE-VISIBLE TIER IS FLAT IN BOTH. Median and mean are flat or slightly
+falling on both prompts, and its max/median ratio has no trend. That remains the
+signature of a fixed reassociation difference that does not accumulate.
+
+eps IS HEAVY-TAILED ON THE CPU-PINNED ARM, which is worth stating on its own:
+overall max/median is 81x (passkey) and 129x (prose) against the device-visible
+tier's 20x and 62x. So on that arm most steps are perturbed by ~0.02 and rare
+steps by 1-2 logits.
+
+The paper already documents that same arm as heavy-tailed in TIME ("host-side
+attention does not merely cost more per step, it costs more variably"). It is now
+also heavy-tailed in ARITHMETIC. WHETHER THE TWO TAILS SHARE A MECHANISM IS NOT
+SETTLED BY THIS DATA AND SHOULD NOT BE CLAIMED — they are two observations about
+the same arm, measured on different quantities, and the co-occurrence is worth
+one sentence and no inference.
+
+WHAT THIS DOES TO THE PAPER
+-----------------------------
+DA-1's objection is VALIDATED with a number. The instrument the paper used —
+token identity under greedy argmax — cannot distinguish exact from near-exact,
+and the arms it certified as identical are near-exact with a measurable gap.
+Section 9's recommendation should be restated in the form the evidence supports:
+
+  "Exact retention reproduced the no-eviction reference's token stream for 512
+  generated tokens on two prompts, two spill tiers and two model architectures.
+  It is not bit-exact: logits differ from the reference by up to 0.28
+  (device-visible) and 2.18 (CPU-pinned), and no step is bit-identical. On both
+  tiers there are steps where the reference's own top1-top2 margin is smaller
+  than twice the perturbation, so a flip is not excluded by the arithmetic — one
+  such step on the device-visible tier and two to six on the CPU-pinned tier,
+  out of 512, with none actually flipping. Reproducible decode is an empirical
+  property of these runs, not a guarantee of the mechanism."
+
+Two things follow, and the first is a correction to what this file said before
+the tiers were separated:
+
+  1. DO NOT RECOMMEND THE DEVICE-VISIBLE TIER ON SAFETY GROUNDS. It is perturbed
+     11.5x less, but its worst-case slack (-0.0350) is the same order as the
+     CPU-pinned tier's (-0.0465), because the at-risk steps are selected by the
+     REFERENCE being nearly tied rather than by the perturbation's size. The
+     supportable statement is that it has fewer at-risk steps (1 against 2-6),
+     not that it is safe where the other is not. Both tiers should be downgraded
+     from "exact" to "token-identical on these runs, not bit-exact".
+  2. THE CPU-PINNED TIER'S CLAIM IS STILL THE WEAKEST IN THE PAPER. It is the
+     slowest arm, the heavy-tailed arm (Section 4's step-time tail), the
+     arithmetically loosest, and the only one whose perturbation may grow with
+     horizon. Bounding device memory is a real property and should be the only
+     thing claimed for it.
+
+LIMITS
+------
+- Two prompts, one model, one budget, 512 tokens. Deterministic, so single runs
+  are sufficient for the arithmetic; they are not sufficient for a claim about
+  the distribution of margins across prompts.
+- max |delta| is over the whole 128256-token vocabulary; the flip analysis is the
+  operative quantity and is reported separately for that reason.
+- The controls establish that cache size alone contributes exactly zero ON THIS
+  RUNTIME with these settings. That is a stronger result than expected and should
+  not be assumed to hold with flash attention on, or on another backend.
+- No claim is made about whether a flip WOULD occur on some other prompt. The
+  measurement bounds the perturbation and the observed margins; it does not
+  bound the margin distribution.

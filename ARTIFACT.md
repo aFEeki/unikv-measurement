@@ -19,7 +19,7 @@ Two archives, both needed:
 
 - Harnesses and data — this repository, [10.5281/zenodo.21907114](https://doi.org/10.5281/zenodo.21907114)
 - The fork — `llama.cpp-unikv`, [10.5281/zenodo.21907123](https://doi.org/10.5281/zenodo.21907123),
-  pinned as a submodule at commit `7c2b27d`, branched from upstream `9725a313b`
+  pinned as a submodule at commit `719463a`, branched from upstream `9725a313b`
 
 ## What is *not* here, and why
 
@@ -68,6 +68,8 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 | RoPE ablation: Finding 5's mechanism isolated (`UNIKV_NO_REENCODE`) | `run_rope_ablation.py` | `stress_results/rope_ablation_block.csv` | `rope_ablation/` |
 | Composed fused-kernel cost; kernel penalty at C=1024 and 2048 | `run_fused_composed.py` | `stress_results/fused_composed_block.csv` | `fused_composed/` |
 | Constant-work thermal control; independent replication of Eq. (1)–(2) | `run_thermal_control.py`, `analyze_thermal_control.py` | `stress_results/thermal_control_block.csv` | `thermal_control/` |
+| Discard granularity; shift-event census; second per-event block | `run_amortized_window.py`, `analyze_reconstruction.py`, `check_slot_effects.py` | `stress_results/amortized_window_block.csv`, `amortized_window_events.csv`, `amortized_window_recheck.csv`, `amortized_window_recheck_c2048.csv` | `amortized_window/` — includes `slot_checks_analysis.txt`, the slot-episode analysis and the pre-registered predictions |
+| Logit bound, argmax margins, at-risk steps | `run_logit_bound.py`, `run_logit_controls.py`, `analyze_logit_margins.py` | `quality_results/logit_bound.csv`, `logit_margins.csv` | `logit_bound/logit_bound_analysis.txt`. The per-step logit dumps are ~2.8 GiB and are **not** archived; the analysis records their sizes and the harness regenerates them |
 | Policy comparison, exactness premium (Table 8) | `run_b2_cooled.py` | `stress_results/b2_policy_block.csv` | `b2_cooled/B2_analysis.txt` — supersedes `r3_policy_compare/policy_compare_analysis.txt` and its `r3_policy_compare_cooled_master.csv`, which lack the device-visible arm |
 
 Where two analysis files are listed, the second corrects the first. Those entries
