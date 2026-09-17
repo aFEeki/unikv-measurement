@@ -1,0 +1,31 @@
+prompt,arm,role,ctx,policy,spill_dev,rc,n_tokens,compared_tokens,first_divergence,identical,flash_attn,n_batch,n_ubatch,tok_per_sec,passkey_found,token_md5,duration_s,text_head
+passkey,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,114.495,True,32c4819b2b626266c91cc2b7ced3a977,6.7,"48291. Remember it. 48291 is the pass key. 
+
+The final sentence is a trick question. The sentence is asking the reader t"
+passkey,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,75.701,True,32c4819b2b626266c91cc2b7ced3a977,12.8,"48291. Remember it. 48291 is the pass key. 
+
+The final sentence is a trick question. The sentence is asking the reader t"
+passkey,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,104.03,True,32c4819b2b626266c91cc2b7ced3a977,8.2,"48291. Remember it. 48291 is the pass key. 
+
+The final sentence is a trick question. The sentence is asking the reader t"
+passkey,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,18,False,disabled,256,256,171.709,True,0fd5cfcd73a97198c3e8de61cc8b6277,5.7,"48291. Remember it. 48291 is the pass key. 
+
+The final answer is 48291. Remember it. 48291 is the pass key. The grass is"
+passkey,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,112.91,True,3a4bd760db7c232a75a9b35b24a45797,4.7,"48291. Remember it. 48291 is the pass key. 
+
+The final sentence is a trick question. The sentence is asking the reader t"
+prose,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,114.504,False,91c9a458a52d1c6fe67261c1cf8841b0,6.7,"p-llama](https://offline-ai.com/cp-llama)
+- C++: [llama.cpp](https://github.com/ggml-org/llama.cpp)
+- C++: [llama-server"
+prose,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,366,False,disabled,256,256,69.763,False,97fec5fc0f16ad051a8560d9e6b76e58,13.8,"p-llama](https://offline-ai.com/cp-llama)
+- C++: [llama.cpp](https://github.com/ggml-org/llama.cpp)
+- C++: [llama-server"
+prose,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,103.264,False,91c9a458a52d1c6fe67261c1cf8841b0,8.2,"p-llama](https://offline-ai.com/cp-llama)
+- C++: [llama.cpp](https://github.com/ggml-org/llama.cpp)
+- C++: [llama-server"
+prose,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,0,False,disabled,256,256,170.255,False,22f2582d47783017d352283d61f577e5,5.7,"pp-llama](https://github.com/offline-ai/cpp-llama)
+- C++: [llama.cpp](https://github.com/ggml-org/llama.cpp)
+- C++: [lla"
+prose,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,111.742,False,87adbf890ca83aae54150fdaad73a20b,4.6,"p-llama](https://offline-ai.com/cp-llama)
+- C++: [llama.cpp](https://github.com/ggml-org/llama.cpp)
+- C++: [llama-server"

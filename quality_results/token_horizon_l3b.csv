@@ -1,0 +1,33 @@
+prompt,arm,role,ctx,policy,spill_dev,rc,n_tokens,compared_tokens,first_divergence,identical,flash_attn,n_batch,n_ubatch,tok_per_sec,passkey_found,token_md5,duration_s,text_head
+passkey,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,60.206,True,a7d65530ab376cd37f6f9491fea9dba0,13.2,"48291. Remember it. 48291 is the pass key.
+
+The grass is green. The sky is blue. The sun is yellow. Here we go. There an"
+passkey,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,36.488,True,a7d65530ab376cd37f6f9491fea9dba0,24.8,"48291. Remember it. 48291 is the pass key.
+
+The grass is green. The sky is blue. The sun is yellow. Here we go. There an"
+passkey,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,53.915,True,a7d65530ab376cd37f6f9491fea9dba0,15.7,"48291. Remember it. 48291 is the pass key.
+
+The grass is green. The sky is blue. The sun is yellow. Here we go. There an"
+passkey,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,3,False,disabled,256,256,79.728,True,a046d6c38ef6462c74b763981f4e0f03,11.7,"48291.
+
+Now, remember the pass key. 48291 is the pass key.
+
+The grass is green. The sky is blue. The sun is yellow. Here"
+passkey,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,60.686,True,fa16721aca83620e994c37fe3ed8c79f,9.7,"48291. Remember it. 48291 is the pass key.
+
+The grass is green. The sky is blue. The sun is yellow. Here we go. There an"
+prose,ref_c8192,no-eviction reference,8192,0,0,0,512,512,,,disabled,256,256,59.87,False,c934ad07bdb9b0edb7a3b515ad2c2b55,13.7,"pengine](https://github.com/offline-ai/cpengine)
+- Rust: [llama-rs/llama](https://github.com/llama-rs/llama)
+- Rust: [ll"
+prose,p3_cpu_c1024,"exact retention, CPU-pinned tier",1024,3,0,0,512,512,,True,disabled,256,256,33.376,False,c934ad07bdb9b0edb7a3b515ad2c2b55,27.8,"pengine](https://github.com/offline-ai/cpengine)
+- Rust: [llama-rs/llama](https://github.com/llama-rs/llama)
+- Rust: [ll"
+prose,p3_dev_c1024,"exact retention, device-visible tier",1024,3,1,0,512,512,,True,disabled,256,256,53.685,False,c934ad07bdb9b0edb7a3b515ad2c2b55,15.8,"pengine](https://github.com/offline-ai/cpengine)
+- Rust: [llama-rs/llama](https://github.com/llama-rs/llama)
+- Rust: [ll"
+prose,p4_h2o_c1024,H2O fixed-budget eviction,1024,4,0,0,512,512,0,False,disabled,256,256,79.719,False,d4ae3a13ba5a047ad7b5e2b19cc2da41,11.7,"lick](https://github.com/offline-ai/click)
+- Rust: [rust-llama/llama](https://github.com/rust-llama/llama)
+- Rust: [rust"
+prose,ctl_ref_c4096,CONTROL: reference at C=4096 (fills at ~262),4096,0,0,0,262,262,,True,disabled,256,256,60.369,False,0f6b49e4cf5e600ef78145ef748e8109,9.7,"pengine](https://github.com/offline-ai/cpengine)
+- Rust: [llama-rs/llama](https://github.com/llama-rs/llama)
+- Rust: [ll"
