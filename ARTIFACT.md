@@ -11,6 +11,7 @@ and the arithmetic for each.
 |---|---|
 | `scripts/` | Measurement harnesses and figure generators |
 | `stress_results/`, `alpha_results/`, `quality_results/` | Raw result CSVs |
+| `quality_results/token_sequences/` | Full sampled-token-ID sequences, four models |
 | `figures/` | Figures as published, regenerable from `scripts/make_fig*.py` |
 | `llama.cpp` (submodule) | The fork the measurements run against |
 
@@ -55,7 +56,7 @@ trusted from the harness source; several analyses fail loudly if it disagrees.
 | Device-visible tier; counterbalanced A/B failure | `run_b1_ceiling.py`, `run_b1_interleaved.py` | `stress_results/b1_device_tier_ceiling.csv`, `b1_interleaved_ab.csv` |
 | Retrieval + 32-token continuation (Table 2) | `run_quality_arms_unified.py` | `quality_results/quality_arms_unified.csv` |
 | H2O comparator fidelity | `run_quality_probe.py` | `quality_results/quality_probe.csv` |
-| 512-token identity, two prompts (Table 3, Fig. 4) | `run_token_horizon.py`, `make_fig8_horizon.py` | `quality_results/token_horizon.csv` |
+| 512-token identity, two prompts (Table 3, Fig. 4) | `run_token_horizon.py`, `make_fig8_horizon.py` | `quality_results/token_horizon.csv`, sequences in `quality_results/token_sequences/` |
 | α sweep slope | `run_alpha_sweep_p3.py` | `alpha_results/p3_alpha_sweep_cooled_master.csv` |
 | Drain control (Table 4, Fig. 3) | `run_drain_control.py`, `make_fig7_drain.py` | `alpha_results/p3_drain_control_master.csv` |
 | drain×α interaction; withdrawal of the 71/29 split (Table 5) | `run_drain_alpha1.py` | `alpha_results/p3_drain_alpha1_master.csv` |
