@@ -21,34 +21,27 @@ Two archives, both needed:
 - The fork: `llama.cpp-unikv`, [10.5281/zenodo.21907123](https://doi.org/10.5281/zenodo.21907123),
   pinned as a submodule at commit `719463a`, branched from upstream `9725a313b`
 
-## What is *not* here
+## What is not here
 
-- **Model weights.** Runs use Llama 3.1 8B, Qwen2.5 7B, Llama 3.2 3B and
-  Llama 3.2 1B, all Instruct at Q4_K_M and all fetched separately. Nothing in
-  the artifact modifies a model.
-- **Build output.** The fork must be built locally; the build tree is several GB
-  and machine-specific.
-- **The paper source.** The data and harnesses make the measurements checkable
-  on their own.
+Model weights: runs use Llama 3.1 8B, Qwen2.5 7B, Llama 3.2 3B and Llama 3.2 1B,
+all Instruct at Q4_K_M and fetched separately, and nothing in the artifact
+modifies a model. Build output: the fork must be built locally, since the build
+tree is several GB and machine-specific. The paper source: the data and
+harnesses make the measurements checkable on their own.
 
 ## Reproducing
 
-Not every claim needs the same effort:
+Token sequences, spill counts, passkey outcomes, logit dumps and graph split
+counts are deterministic under greedy decoding at a fixed seed and reproduce on
+any machine that runs the fork; `quality_results/token_horizon.csv` is the
+clearest case. Capacity outcomes are binary and need no thermal protocol.
+Anything in tok/s or ms/step needs the cooled protocol of the paper's
+methodology section: randomized block order, 200 s cooldowns, an otherwise idle
+machine, and runs left uninstrumented, because the per-step log itself drains
+the GPU pipeline. Numbers produced without it will not match.
 
-- **Deterministic**: token sequences, spill counts, passkey outcomes, logit
-  dumps and graph split counts. Greedy decoding at a fixed seed, so these reproduce on any
-  machine that runs the fork. `quality_results/token_horizon.csv` is the
-  clearest case.
-- **Binary**: capacity outcomes. A configuration either executes or is refused;
-  no thermal protocol needed.
-- **Rates**: anything in tok/s or ms/step. These require the cooled protocol
-  described in the paper's methodology section: randomised block order, 200 s
-  cooldowns, an otherwise idle machine, and runs left uninstrumented because the
-  per-step log itself drains the GPU pipeline. Numbers produced without that
-  protocol will not match.
-
-Flash attention state is parsed back from each run's own stderr rather than
-trusted from the harness source; several harnesses fail loudly if it disagrees.
+Flash attention state is read back from each run's own log rather than trusted
+from the harness, and several harnesses stop on a mismatch.
 
 ## Traceability
 
@@ -82,8 +75,7 @@ Table numbers follow the paper.
 | Table 8: policy comparison, exactness premium | `run_b2_cooled.py` | `stress_results/b2_policy_block.csv` |
 
 Result files not listed above are earlier runs that a later cooled block
-replaced. They are kept rather than pruned; the paper names which block
-supersedes which.
+replaced. They are kept, and the paper quotes none of them.
 
 ## License
 
