@@ -29,10 +29,16 @@ import struct
 ROOT      = Path(__file__).resolve().parents[1]
 LLAMA_DIR = ROOT / "llama.cpp"
 BIN       = LLAMA_DIR / "build-m4pro-metal" / "bin" / "llama-completion"
-MODEL     = LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-PROMPTS   = ROOT / "artifacts" / "token_horizon" / "prompts"
-ART       = ROOT / "artifacts" / "logit_bound"
+# UNIKV_MODEL / UNIKV_LOGIT_TAG run the same measurement on another model, with
+# that model's own token-horizon prompts. Unset, this reproduces the Llama 3.1
+# block byte for byte.
+MODEL     = Path(os.environ.get("UNIKV_MODEL",
+            LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
+LTAG      = os.environ.get("UNIKV_LOGIT_TAG", "")
+PROMPTS   = ROOT / "artifacts" / (f"token_horizon_{LTAG}" if LTAG else "token_horizon") / "prompts"
+ART       = ROOT / "artifacts" / (f"logit_bound_{LTAG}" if LTAG else "logit_bound")
 RESULTS   = ROOT / "quality_results"
+OUT_NAME  = f"logit_bound_{LTAG}.csv" if LTAG else "logit_bound.csv"
 
 GEN, BATCH, SEED = 512, 256, 123
 REF = "ref_c8192"
@@ -135,7 +141,7 @@ def main():
                          "tokens_matching": same, "n_vocab": n_vocab})
         print()
 
-    out = RESULTS / "logit_bound.csv"
+    out = RESULTS / OUT_NAME
     with out.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader(); w.writerows(rows)

@@ -21,12 +21,14 @@ Two questions the pooled numbers could not answer:
 No new runs: this reads the dumps already in artifacts/logit_bound/.
 """
 
-import csv, sys
+import csv, os, sys
 import numpy as np
 from pathlib import Path
 
-ART = Path(__file__).resolve().parents[1] / "artifacts" / "logit_bound"
-OUT = Path(__file__).resolve().parents[1] / "quality_results" / "logit_margins.csv"
+# UNIKV_LOGIT_TAG reads another model's dumps (see run_logit_bound.py).
+_T  = os.environ.get("UNIKV_LOGIT_TAG", "")
+ART = Path(__file__).resolve().parents[1] / "artifacts" / (f"logit_bound_{_T}" if _T else "logit_bound")
+OUT = Path(__file__).resolve().parents[1] / "quality_results" / (f"logit_margins_{_T}.csv" if _T else "logit_margins.csv")
 NV  = 128256
 ARMS = ["p3_cpu_c1024", "p3_dev_c1024", "p4_h2o_c1024"]
 

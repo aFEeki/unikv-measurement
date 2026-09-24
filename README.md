@@ -17,32 +17,29 @@ is that such a cache should never discard anything: spill it and recall it
 exactly.
 
 We implemented that policy in a `llama.cpp` fork and measured it on an M4 Pro
-across four models. The implication fails. Five findings:
+across four models, against the unmodified runtime holding the same context
+resident. The implication fails. Three findings:
 
-1. **The cost of exact retention is affine, with a fixed and a per-cell term.**
-   Entering the two-tier attention path costs 9.7 ms per decode step with the
-   retained tier read by the host and 2.7 ms with it read by the accelerator,
-   against 3.1 and 2.2 µs per retained cell. Neither term is a byte count; both
-   scale with layer count to within ±10% across the four models.
-2. **Retrieval does not separate lossless retention from eviction.** An H2O
-   heavy-hitter evictor recovers a passkey far outside its resident window at
-   the same capacity and runs faster. Only token identity with the no-eviction
-   reference separates them, and it held on 15 of 16 arm-and-prompt pairs over
-   four models and failed once.
-3. **Simulated transfer cost is inseparable from the instrument that exposes
-   it.** The pipeline drain has no cost of its own; it costs whatever delay it
-   stops the pipeline absorbing, so it cannot be calibrated away.
-4. **Capacity limits appear at execution, not allocation.** Contexts allocate at
-   1.80x the advisory working-set budget and are refused once the memory is
-   touched past it. A scratch term set by the micro-batch predicts the ceiling on
-   three unseen architectures. Counted across both tiers, exact retention's
-   footprint at 65k tokens is within 3% of upstream's.
-5. **What a rolling window costs is set by how much it discards per event.**
-   Evicting one cell per overflow, it is slower than H2O; discarding half the
-   cache per event, as upstream ships, it is faster.
+1. **What retention costs.** A fixed charge on every decode step, 0.58-1.51 ms
+   with the retained tier read by the accelerator and 3.5-8.5 ms with it read
+   by the host, growing with layer count; on the host tier the scheduler adds
+   exactly two graph splits per layer. Per retained cell, 92-95% of the
+   device-tier cost is ordinary unfused attention the runtime pays anyway;
+   retention adds a 5.5-8.4% surcharge.
+2. **What it buys.** Not retrieval: an H2O heavy-hitter evictor recovers a
+   passkey far outside its resident window at the same capacity and runs
+   faster. Only token identity with the no-eviction reference separates them,
+   and it held on 15 of 16 arm-and-prompt pairs. Where it failed, a near-tie
+   in the reference's logits met the host tier's larger perturbation.
+3. **What limits capacity.** Contexts allocate at 1.80x the advisory
+   working-set budget and are refused when the memory is touched. A larger
+   resident cache reaches as far as the device tier and runs faster; the host
+   tier reaches further at 3.9-10.7x the decode cost, on the same total
+   physical memory to within 3%.
 
-What exact retention buys is narrow: reproduction of the no-eviction computation
-token for token, as an observed outcome rather than a guarantee.
+Two results concern measurement rather than retention: delay injection needs
+a pipeline drain, and the drain has no fixed cost that could be subtracted;
+and a rolling window's cost is set by how much it discards per shift event.
 
 ## Layout
 
@@ -74,8 +71,8 @@ them.
 
 Claims differ in what they need:
 
-- **Deterministic** (token sequences, spill counts, passkey outcomes, graph
-  split counts): greedy decoding at a fixed seed, reproduces anywhere the fork
+- **Deterministic** (token sequences, spill counts, passkey outcomes, logit
+  dumps, graph split counts): greedy decoding at a fixed seed, reproduces anywhere the fork
   runs.
 - **Binary** (capacity outcomes): a configuration either executes or is refused.
 - **Rates** (tok/s, ms/step): require the cooled protocol, meaning randomised
