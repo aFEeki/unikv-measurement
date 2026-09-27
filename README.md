@@ -18,18 +18,20 @@ policy into a `llama.cpp` fork and measured it on an M4 Pro, on four models,
 against the unmodified runtime holding the same context resident.
 
 Retention is not free. It adds a fixed charge on every decode step,
-0.58–1.51 ms when the accelerator reads the retained tier and 3.5–8.5 ms when
-the host does, and the charge grows with layer count; on the host tier the
-scheduler adds two graph splits per layer. Per retained cell, 92–95% of the
-device-tier cost is attention the runtime pays anyway, and retention adds
-5.5–8.4% on top.
+3.5–8.5 ms when the host reads the retained tier and 0.58–1.51 ms when the
+accelerator does. On the host tier the scheduler adds two graph splits per
+layer. On the accelerator 27–41% of the charge is the fork copying each
+demoted cell one element at a time, and the rest costs the same per layer on
+every model. Per retained cell, 92–95% of the device-tier cost is attention the
+runtime pays anyway, and retention adds 5.5–8.4% on top. Both costs belong to
+this runtime, whose fused attention kernel cannot merge results from two tiers.
 
 It buys little. A heavy-hitter evictor recovers a passkey far outside its
 resident window at the same capacity and runs faster. A larger resident cache
 reaches as far as the device tier and runs faster; the host tier reaches
 further, at 3.9–10.7× the decode cost and on the same total physical memory to
-within 3%. What retention does buy is token-for-token reproduction of the
-no-eviction computation. That held on 15 of 16 arm-and-prompt pairs and failed
+within 2%. What retention does buy is token-for-token reproduction of the
+no-eviction computation. That held on 15 of 16 model, tier and prompt combinations and failed
 where a near-tie in the reference's logits met the host tier's larger
 perturbation.
 

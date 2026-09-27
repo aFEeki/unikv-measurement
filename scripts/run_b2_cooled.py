@@ -98,7 +98,11 @@ SHUFFLE    = 20260807
 
 # ---- block 1 ---------------------------------------------------------------
 ISO_CTX     = 1024
-ISO_TARGETS = [0, 512, 1024, 2048, 4096, 8192]
+ISO_TARGETS = [int(x) for x in os.environ.get(
+    "UNIKV_ISO_TARGETS", "0,512,1024,2048,4096,8192").split(",")]
+# UNIKV_ISO_TARGETS lets a block add small targets (8, 32, 128) so gamma can be
+# fitted LOCALLY instead of extrapolated back from 512+, where the CPU-pinned
+# arm carries almost all of its variance.
 ISO_BURST   = 128
 ISO_WARMUP  = 32          # drops the one-off graph-realloc step after prefill
 ISO_TRIALS  = 3
@@ -232,13 +236,29 @@ def launch(prompt, ctx, policy, dev, gen, tag, steplog, spill_cap):
 # ============================ BLOCK 1 =======================================
 def block1():
     print("== BLOCK 1: isochronal recall cost, both tier modes ==")
-    plan = []
-    for dev in ("0", "1"):
-        for target in ISO_TARGETS:
-            n = ISO_EXTRA.get((dev, target), ISO_TRIALS)
-            plan += [(dev, target, t) for t in range(1, n + 1)]
-    random.Random(SHUFFLE).shuffle(plan)
-    print(f"  {len(plan)} runs, randomized (seed {SHUFFLE}), {COOLDOWN_S}s cooldowns")
+    # UNIKV_B2_ROUNDS=1 -> randomised COMPLETE block: each round is a fresh
+    # permutation of every cell, so target and tier mode are orthogonal to
+    # execution position BY CONSTRUCTION rather than by a lucky global shuffle.
+    # Default (unset) keeps the single global shuffle the Llama and Qwen blocks
+    # used, so those remain reproducible from this script.
+    complete = os.environ.get("UNIKV_B2_ROUNDS", "0") == "1"
+    if complete and not ISO_EXTRA:
+        cells = [(dev, target) for dev in ("0", "1") for target in ISO_TARGETS]
+        rng, plan = random.Random(SHUFFLE), []
+        for r in range(1, ISO_TRIALS + 1):
+            rnd = cells[:]; rng.shuffle(rnd)
+            plan += [(dev, target, r) for dev, target in rnd]
+        print(f"  {len(plan)} runs, randomised COMPLETE block "
+              f"({ISO_TRIALS} rounds x {len(cells)} cells, seed {SHUFFLE}), "
+              f"{COOLDOWN_S}s cooldowns")
+    else:
+        plan = []
+        for dev in ("0", "1"):
+            for target in ISO_TARGETS:
+                n = ISO_EXTRA.get((dev, target), ISO_TRIALS)
+                plan += [(dev, target, t) for t in range(1, n + 1)]
+        random.Random(SHUFFLE).shuffle(plan)
+        print(f"  {len(plan)} runs, randomized (seed {SHUFFLE}), {COOLDOWN_S}s cooldowns")
     if ISO_EXTRA:
         print(f"  n_spill=4096 CPU-pinned gets {ISO_EXTRA[('0', 4096)]} trials "
               f"(re-testing the 44.0-60.9 ms anomaly)")

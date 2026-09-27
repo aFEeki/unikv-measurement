@@ -18,6 +18,14 @@ Two questions the pooled numbers could not answer:
    accumulating? Flat points at a fixed reassociation difference. Growing points
    at accumulation and predicts failure at longer horizons than 512.
 
+3. Did the perturbation actually move the reference's top-two margin? max
+   |delta logit| over the vocabulary bounds the shift; the shift itself is
+   (arm[i] - arm[j]) - (ref[i] - ref[j]) for the reference's top two tokens i
+   and j. Reported up to the first step where the arm's argmax leaves the
+   reference's (all steps if it never does), with the margin and shift at that
+   step. After it the two runs condition on different tokens and stop being
+   comparable.
+
 No new runs: this reads the dumps already in artifacts/logit_bound/.
 """
 
@@ -46,6 +54,7 @@ def main():
         part = np.partition(ref, -2, axis=1)
         m = (part[:, -1] - part[:, -2]).astype(np.float64)
         top1 = ref.argmax(axis=1)
+        top2 = np.argsort(ref, axis=1)[:, -2]
         print(f"\n=== {pname} ===  {ref.shape[0]} steps")
         print(f"  reference top1-top2 margin: min {m.min():.6g}  median {np.median(m):.4g}")
         print(f"  {'arm':14} {'max eps':>10} {'min(m-2eps)':>13} {'steps m<=2eps':>14} "
@@ -67,13 +76,32 @@ def main():
             qs = "  ".join(f"{x.mean():.4g}" for x in q)
             r = np.corrcoef(np.arange(n), eps)[0, 1]
             print(f"                 eps by quarter: {qs}   pearson r vs step = {r:+.3f}")
+            # direct shift of the reference's top-two margin, up to the first flip
+            idx = np.arange(n)
+            arm_m = (arm[idx, top1[:n]] - arm[idx, top2[:n]]).astype(np.float64)
+            shift = arm_m - m[:n]
+            off = np.flatnonzero(arm[:n].argmax(axis=1) != top1[:n])
+            ff = int(off[0]) if off.size else n
+            pre = slice(0, ff)
+            qp = np.array_split(eps[pre], 4) if ff >= 4 else [np.array([np.nan])] * 4
+            print(f"                 first flip {ff if off.size else 'none'}; before it: "
+                  f"max eps {eps[pre].max() if ff else float('nan'):.4g}, "
+                  f"max |margin shift| {np.abs(shift[pre]).max() if ff else float('nan'):.4g}, "
+                  f"min own margin {arm_m[pre].min() if ff else float('nan'):.4g}")
             rows.append({"prompt": pname, "arm": tag, "steps": n,
                          "max_eps": eps.max(), "min_slack": slack.min(),
                          "steps_at_risk": at_risk, "actual_flips": flips,
                          "eps_q1": q[0].mean(), "eps_q2": q[1].mean(),
                          "eps_q3": q[2].mean(), "eps_q4": q[3].mean(),
                          "eps_r_vs_step": r,
-                         "ref_min_margin": m[:n].min()})
+                         "ref_min_margin": m[:n].min(),
+                         "first_flip": ff if off.size else "",
+                         "max_eps_pre_flip": eps[pre].max() if ff else "",
+                         "max_margin_shift": np.abs(shift[pre]).max() if ff else "",
+                         "min_arm_margin": arm_m[pre].min() if ff else "",
+                         "eps_pre_q1": qp[0].mean(), "eps_pre_q4": qp[3].mean(),
+                         "flip_ref_margin": m[ff] if off.size else "",
+                         "flip_margin_shift": shift[ff] if off.size else ""})
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)

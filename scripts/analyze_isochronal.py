@@ -40,6 +40,7 @@ from pathlib import Path
 KV_KIB_PER_CELL = {
     "llama": 128.0,   # 32 layers x (1024+1024) x 2 B  = 131072 B
     "qwen":   56.0,   # 28 layers x ( 512+ 512) x 2 B  =  57344 B
+    "l3b":   112.0,   # 28 layers x (1024+1024) x 2 B  = 114688 B  (Llama 3.2 3B)
 }
 
 
