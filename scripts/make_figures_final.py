@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Regenerate the three paper figures from the FINAL locked CSVs.
+"""Figures from an earlier draft (fig1_baseline, fig3_tokens, fig4_alpha); the paper does not use them.
 
-Locked values are hardcoded below; each is asserted against its source CSV and
-the script raises (naming the CSV) on any disagreement rather than silently
-substituting. IEEE single-column (3.5 in), grayscale-safe, matplotlib serif
-style consistent with the existing figures.
+Regenerates the three figures from their locked values. Each value is asserted
+against its source CSV, and the script stops, naming the CSV, on any
+disagreement. Single-column (3.5 in), grayscale-safe, serif matplotlib style.
 
-Outputs -> ../figures/ :
-  fig1_baseline.pdf/.png   baseline decode throughput vs context (e2e)
-  fig3_tokens.pdf/.png     tokens generated, baseline vs UniKV (count, not tok/s)
-  fig4_alpha.pdf/.png      alpha sweep, UniKV e2e tok/s, error bars = +/-1 STD
+  fig1_baseline.pdf/.png   baseline decode throughput against context (e2e)
+  fig3_tokens.pdf/.png     tokens generated per policy before halting or at the
+                           decode budget (a count, not a rate)
+  fig4_alpha.pdf/.png      policy-3 alpha sweep, e2e tok/s, error bars +/- 1 SD
+
+fig3_tokens also needs an A100 baseline CSV that is not in this archive.
 """
 from __future__ import annotations
 
@@ -30,15 +31,14 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 TOL = 0.005  # values are printed to 2 dp; agree within half a hundredth
 
 # ----------------------------------------------------------------------------
-# LOCKED VALUES (final; figures conform to these, not the reverse)
+# locked values; the figures conform to these
 # ----------------------------------------------------------------------------
 FIG1_LOCK = {4096: 40.40, 8192: 36.50, 16384: 29.88, 32768: 20.72}  # ctx -> e2e tok/s
 
-# Fig 3 now carries the policy-1 rolling-window arm alongside the error-out
-# baseline (review M1/DA-3: policy 1 is the comparator a practitioner reaches
-# for, it also completes the budget, and omitting it made "4x" read as a
-# property of UniKV rather than of the baseline's error path). The decode budget
-# is drawn as a reference line so "completes vs halts" is what the figure says.
+# Fig 3 shows the rolling window (policy 1) alongside the halting baseline. The
+# window also completes the budget, so the difference in token count belongs to
+# the baseline's error path, not to retention. The decode budget is drawn as a
+# reference line, so the figure reads as completes against halts.
 FIG3_CSV     = STRESS_DIR / "r3_policy_compare_cooled_master.csv"
 FIG3_A100_CSV = ROOT / "a100_benchmark(server version)" / "baseline_a100.csv"
 FIG3_BUDGET  = 2048
@@ -49,10 +49,10 @@ FIG3_LOCK = [
     ("M4 Pro\nUniKV",      2048, "p3_c1024"),   # lossless and completes
 ]
 
-# Fig 4 now = policy-3 recall-cost sweep, COOLED (R2 final; supersedes the old
-# policy-1 numbers). Measured e2e wall-clock tok/s, +/-1 STD (sample, ddof=1),
-# from the cooled master CSV. alpha=0 is the unified-memory anchor (no per-step
-# sync); alpha>0 is the blocking transfer-cost trend.
+# Fig 4: the cooled policy-3 alpha sweep. Measured e2e wall-clock tok/s,
+# +/- 1 SD (sample, ddof=1), from the cooled master CSV. alpha = 0 runs without
+# the per-step drain and alpha > 0 runs with it, so the two differ by the drain
+# as well as the injected delay (Appendix A of the paper).
 FIG4_CSV    = ALPHA_DIR / "p3_alpha_sweep_cooled_master.csv"
 FIG4_ALPHAS = [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
 FIG4_MEAN   = {0.0: 29.67, 0.25: 29.19, 0.5: 28.67, 0.75: 28.50, 1.0: 28.25, 1.5: 27.59, 2.0: 27.01}
@@ -207,7 +207,7 @@ def fig4_alpha() -> None:
     sp  = [FIG4_STD[x]  for x in pos]
 
     fig, ax = plt.subplots(figsize=FIGSIZE)
-    # alpha=1.0 PCIe-equivalent guide (marker only; NOT a throughput comparator)
+    # alpha=1.0 PCIe-equivalent guide (a marker only, not a throughput comparison)
     ax.axvline(1.0, color=DARK, linestyle="--", linewidth=0.8, alpha=0.5)
     ax.text(1.06, 0.6, "PCIe 4.0 x16 equiv", rotation=90, ha="left", va="bottom",
             fontsize=7, color=DARK)
@@ -218,8 +218,8 @@ def fig4_alpha() -> None:
                 ecolor=GRAY, elinewidth=1.0, capsize=2.5, capthick=0.9,
                 linewidth=1.5, zorder=3, label=r"$\alpha{>}0$ (transfer trend)")
 
-    # alpha=0: unified-memory anchor, plotted distinctly and NOT joined to the
-    # trend line (the non-blocking -> blocking transition is a real discontinuity)
+    # alpha=0: plotted separately and not joined to the trend line, because it
+    # has no pipeline drain and the alpha > 0 points do (Appendix A)
     ax.errorbar([0.0], [FIG4_MEAN[0.0]], yerr=[FIG4_STD[0.0]], marker="D",
                 markersize=5.5, color=DARK, markerfacecolor="white",
                 markeredgecolor=DARK, markeredgewidth=1.2, ecolor=GRAY,

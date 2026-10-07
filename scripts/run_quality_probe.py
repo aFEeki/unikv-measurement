@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""
-Path B (Issue 2) output-QUALITY comparison: does non-destructive retention
-(policy 2) preserve information that rolling-window eviction (policy 1) destroys?
+"""Earliest passkey probe: retention (policy 2) against the rolling window (policy 1).
 
-Design — long-range passkey retrieval (needle-in-haystack):
-  prompt = intro + short pre-filler + PASSKEY line (placed EARLY) + long
-           post-filler + trailing question ("... The pass key is").
-  Decode the SAME prompt under two arms, greedy (temp 0):
-    arm A  UNIKV_POLICY=1  -c 1024   prompt >> cache -> rolling shift evicts the
-                                     early passkey (destructive).
-    arm B  UNIKV_POLICY=2  -c 4096   whole sequence fits -> nothing evicted
-                                     (lossless retention).
-  Metric: exact-match — does the greedy completion contain the passkey?
-  Expectation: arm B recovers the passkey, arm A does not; arm A's per-step
-  UNIKV_LOG shows shift_events > 0 (evidence the eviction actually happened).
+Policy 2 is an early retention variant that the paper does not evaluate; the
+fork still implements it. This probe and quality_probe.csv record that first
+comparison.
 
-Same input, differing only in (policy, ctx). Results -> quality_results/
-(mirrors alpha_results/). Full generated text + logs -> artifacts/quality_probe/.
+Design: long-range passkey retrieval. The prompt is an introduction, a short
+filler, the passkey line placed early, a long filler and a closing question
+("... The pass key is"). The same prompt is decoded greedily under two arms:
 
-This is a correctness experiment (greedy, deterministic); it reports NO tok/s.
+  arm A  UNIKV_POLICY=1, -c 1024   the prompt exceeds the cache, so the rolling
+                                   shift evicts the early passkey
+  arm B  UNIKV_POLICY=2, -c 4096   the whole sequence fits; nothing is evicted
+
+Metric: exact match, whether the greedy completion contains the passkey. Arm A's
+per-step UNIKV_LOG must show shift events, as evidence that eviction happened.
+
+Same input, differing only in (policy, ctx). Results go to quality_results/;
+generated text and logs go to artifacts/quality_probe/. Deterministic; reports
+no tok/s.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ LOGS_DIR       = ARTIFACT_DIR / "logs"
 PASSKEY      = "48291"
 FILLER       = ("The grass is green. The sky is blue. The sun is yellow. "
                 "Here we go. There and back again. ")
-PRE_REPEAT   = 7     # keep the passkey EARLY (~within the first ~200 tokens)
+PRE_REPEAT   = 7     # keep the passkey early (within about the first 200 tokens)
 POST_REPEAT  = 150   # pad the tail so total prompt ~3k tokens
 INTRO        = ("There is an important piece of information hidden inside the "
                 "text below. Find it and remember it, because you will be asked "
@@ -59,7 +59,7 @@ GEN_TOKENS   = 32
 THREADS      = 10
 GPU_LAYERS   = 999
 SEED         = 123
-# (policy, ctx) arms — same prompt, differ only here.
+# (policy, ctx) arms: same prompt, differ only here.
 ARMS         = [(1, 1024), (2, 4096)]
 
 
@@ -175,8 +175,8 @@ def main() -> None:
     print(f"  passkey ends at ~tok : {passkey_end_pos} (early)")
     print(f"  arms                 : {ARMS}")
 
-    # Sanity: arm A must overflow (evict), arm B must fit, passkey must fall
-    # OUTSIDE arm A's retained tail window so it is genuinely destroyed.
+    # Sanity: arm A must overflow (evict), arm B must fit, and the passkey must
+    # fall outside arm A's retained tail window, so it is actually evicted.
     big_ctx = max(c for _, c in ARMS)
     checks = {
         "arm A overflows (prompt > small ctx)":        prompt_tokens > small_ctx,

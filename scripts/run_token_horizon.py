@@ -1,46 +1,47 @@
 #!/usr/bin/env python3
-"""Token-identity horizon: how far does exact retention stay bit-identical?
+"""Token-identity horizon: how far does exact retention stay bit-identical to the reference?
 
-The paper's only positive recommendation — that exact retention buys
-reproducible decode — rested on 32 generated tokens on one prompt. This extends
-the horizon to 512 tokens on two structurally different prompts and reports, per
-arm per prompt, the token index at which the arm FIRST diverges from the
-no-eviction reference rather than only whether it does.
+An earlier draft's identity claim rested on 32 generated tokens on one prompt.
+This extends the horizon to 512 tokens on two structurally different prompts
+and reports, per arm and prompt, the token index at which the arm first
+diverges from the no-eviction reference, not only whether it does.
 
 Arms (one block, one batch tiling, flash attention off, greedy, seed 123):
-  ref_c8192      policy 0, C=8192  -- the no-eviction reference
-  p3_cpu_c1024   policy 3, C=1024, UNIKV_SPILL_DEV=0   exact retention, CPU tier
-  p3_dev_c1024   policy 3, C=1024, UNIKV_SPILL_DEV=1   exact retention, GPU tier
-  p4_h2o_c1024   policy 4, C=1024                      H2O fixed-budget eviction
-  ctl_ref_c4096  policy 0, C=4096  -- CONTROL, see below
+  ref_c8192      policy 0, C = 8192: the no-eviction reference
+  p3_cpu_c1024   policy 3, C = 1024, UNIKV_SPILL_DEV=0   exact retention, CPU-pinned tier
+  p3_dev_c1024   policy 3, C = 1024, UNIKV_SPILL_DEV=1   exact retention, device-visible tier
+  p4_h2o_c1024   policy 4, C = 1024                      H2O fixed-budget eviction
+  ctl_ref_c4096  policy 0, C = 4096: a control, see below
 
-Why the reference is C=8192 and not C=4096. The brief specified C=4096, which
-was right at the old 32-token horizon: 3834 + 32 = 3866 fits. At 512 tokens the
-same prompt needs 4346 cells, so C=4096 would itself evict and could not serve
-as a no-eviction reference. C=8192 holds the whole run with room to spare.
+Why the reference is C = 8192 and not 4096: the 32-token survey used C = 4096,
+which was right at that horizon (3834 + 32 = 3866 cells fit). At 512 tokens the
+same prompt needs 4346 cells, so C = 4096 would itself evict and could not serve
+as a no-eviction reference. C = 8192 holds the whole run.
 
-ctl_ref_c4096 exists to show that choice is harmless: over the 262 generated
-tokens before C=4096 fills, it must emit exactly the same tokens as the C=8192
-reference. If it does, the reference does not depend on the cache size and the
-substitution is free. If it does not, that is itself a finding and every
-identity claim in the paper would need re-examining.
+ctl_ref_c4096 shows that the substitution is harmless: over the 262 tokens it
+generates before C = 4096 fills, it must emit exactly the tokens of the C = 8192
+reference. If it does, the reference does not depend on the cache size; if it
+did not, every identity claim would need re-examining.
 
-Two prompts, matched to the same token count so the arms see identical cache
+Two prompts, matched to the same token count, so the arms see the same cache
 pressure and differ only in structure:
   passkey  the published probe: repetitive filler with a planted key. Low
            entropy, and therefore possibly unusually easy to reproduce.
-  prose    a prefix of llama.cpp's README: natural technical English with
-           markdown, lists, links and code spans. Much higher entropy, and the
-           harder test of the identity claim.
+  prose    a prefix of llama.cpp's README: technical English with markdown,
+           lists, links and code spans. Much higher entropy, and the harder
+           test of identity.
 
-The run does NOT stop at first divergence — every arm generates the full budget
-and the complete token sequence is written out, because the trace after the
-divergence is part of the result.
+The run does not stop at the first divergence: every arm generates the full
+budget and the complete token sequence is written out, because the trace after
+the divergence is part of the result.
 
 Identity under greedy decoding with a fixed seed is deterministic and does not
-depend on thermal state, so this block uses no cooldowns. It also records
-throughput, but those figures are UNCOOLED and single-trial and must not be
-quoted as rates.
+depend on thermal state, so this block has no cooldowns. It also records
+throughput, but those figures are uncooled and single-trial and are not rates to
+quote.
+
+UNIKV_MODEL and UNIKV_TAG run the same block on another model, with that model's
+own prompts.
 """
 
 import csv
@@ -57,8 +58,8 @@ LLAMA_DIR      = ROOT / "llama.cpp"
 BIN_DIR        = LLAMA_DIR / "build-m4pro-metal" / "bin"
 COMPLETION_BIN = BIN_DIR / "llama-completion"
 TOKENIZE_BIN   = BIN_DIR / "llama-tokenize"
-# Model and output tag are overridable so a second model runs THIS code path.
-# With both unset the Llama block reproduces exactly.
+# Model and output tag can be overridden, so another model runs this code path.
+# With both unset, the Llama block reproduces exactly.
 MODEL_PATH     = Path(os.environ.get(
     "UNIKV_MODEL", LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
 TAG            = os.environ.get("UNIKV_TAG", "")
@@ -74,7 +75,7 @@ GEN_TOKENS    = int(os.environ.get("UNIKV_TH_GEN", "512"))
 PROMPT_TOKENS = 3834          # matches the published probe exactly
 THREADS       = 10
 GPU_LAYERS    = 999
-BATCH         = 256           # ONE batch tiling, as in the six-arm block
+BATCH         = 256           # one batch tiling, as in the six-arm block
 UBATCH        = 256
 SEED          = 123
 SPILL_CAP     = 8192
@@ -120,7 +121,7 @@ def build_passkey_prompt() -> Path:
     The Llama version hard-coded 150 filler repeats and asserted the total. A
     different tokenizer gives a different count for the same text, so the repeat
     count is solved for here and the remainder padded with a single-token unit.
-    The prompt therefore stays the same PROBE (same intro, same planted key, same
+    The prompt therefore stays the same probe (same intro, same planted key, same
     question, same repetitive filler) at the same length across models, which is
     what the comparison needs; only the repeat count moves."""
     p = PROMPTS_DIR / "prompt_passkey.txt"
@@ -139,7 +140,7 @@ def build_passkey_prompt() -> Path:
             hi = mid - 1
     if best is None:
         raise RuntimeError("passkey scaffold alone exceeds the budget")
-    # Pad to the exact count. The pad count is SOLVED, not assumed: inserting the
+    # Pad to the exact count. The pad count is solved, not assumed: inserting the
     # unit changes tokenization at the seams, so k pad units need not add k tokens.
     pad, seen = 0, {}
     for _ in range(16):

@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
-"""Recall cost at CONTROLLED spilled-set size (the clean version of the curve).
+"""Recall cost at a controlled spilled-set size: the isochronal design.
 
-Why this exists. In a single long decode run the spilled set grows
-monotonically with elapsed time, so on a passively cooled device n_spill and
-thermal state are perfectly confounded: the marginal cost per spilled cell
-measured across one run is part recall and part heating, and no within-run
-regression can separate them (the policy-1 control in
-run_recall_cost_sweep.py measures the droop of a DIFFERENT, GPU-only workload,
-and its droop saturates on a different timescale than the CPU-heavy policy-3
-run, so subtracting it is an approximation at best).
+In a single long decode run the spilled set grows monotonically with elapsed
+time, so on a passively cooled device n_spill and thermal state are confounded:
+the cost per spilled cell measured across one run is part recall and part
+heating, and no within-run regression can separate them. The policy-1 control in
+run_recall_cost_sweep.py measures the droop of a different, GPU-only workload,
+whose droop settles on a different timescale than the CPU-heavy policy-3 run,
+so subtracting it is only an approximation.
 
-This harness decouples the two. For each target spilled-set size it builds a
+This harness separates the two. For each target spilled-set size it builds a
 prompt of (C + target) tokens, so the spilled tier is established during
-PREFILL, then decodes a short burst of 128 tokens and times only those. Across
-the burst n_spill moves by 128 out of the target, so each point is a per-step
-cost at an essentially fixed spilled-set size, measured inside a few seconds
-rather than across ten minutes. Points are run in randomized-block order with
-cooldowns, so thermal state is decorrelated from n_spill instead of aliased
-onto it.
+prefill, then decodes a short burst of 128 tokens and times only those. Across
+the burst n_spill moves by 128, so each point is a per-step cost at a nearly
+fixed spilled-set size, measured within a few seconds rather than across ten
+minutes. Targets run in randomized-block order with cooldowns, so thermal state
+is spread across n_spill instead of aliased onto it.
 
-Protocol: policy 3, C=1024, -fa off, -fit off, greedy (temp 0), seed 123,
---ignore-eos, -b/-ub 512, alpha 0, UNIKV_LOG on (per-call wall clock is
-bracketed by synchronize() on both ends). flash_attn is read back from each
+Protocol: policy 3, C = 1024, -fa off, -fit off, greedy (temperature 0), seed
+123, --ignore-eos, -b/-ub 512, alpha 0, UNIKV_LOG on (the per-call wall clock is
+bracketed by synchronize() at both ends). flash_attn is read back from each
 run's own log.
+
+Block 1 of run_b2_cooled.py repeats this design under the full cooled protocol
+for both tiers; the paper's coefficients come from there.
 """
 
 import csv

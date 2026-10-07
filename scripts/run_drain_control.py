@@ -1,32 +1,33 @@
 #!/usr/bin/env python3
-"""alpha=0-with-drain control (review M4, DA-5).
+"""Control for the alpha = 0 offset: the pipeline drain at alpha = 0.
 
-The alpha sweep applies llama_context::synchronize() only at alpha>0, so the
-alpha=0 arm does not pay the pipeline drain that every alpha>0 arm pays. The
-reported alpha=0 offset below the alpha>0 fit is therefore partly by
-construction: instrumentation differs across the treatment boundary, so the
-offset cannot by itself be evidence of a non-blocking/blocking transition.
+The alpha sweep calls llama_context::synchronize() only at alpha > 0, so the
+alpha = 0 arm does not pay the pipeline drain that every alpha > 0 arm pays.
+The alpha = 0 offset below the alpha > 0 fit is therefore partly built in: the
+instrumentation differs across the treatment boundary, and the offset alone
+cannot show a transition from non-blocking to blocking recall.
 
-UNIKV_DRAIN (added for this control) decouples the two:
-  unset -> drain iff alpha > 0   (the published behavior)
+UNIKV_DRAIN, added for this control, separates the two:
+  unset -> drain if alpha > 0 (the default)
   1     -> drain even at alpha = 0
   0     -> never drain, even at alpha > 0
 
-Five conditions, randomized-block with cooldowns, otherwise identical to the
-cooled alpha sweep (policy 3, C=1024, 512-token prompt, 2048 decode, -fa off,
-seed 123, greedy, uninstrumented so the per-step logging synchronize() pair does
-not itself drain):
+Five conditions in a randomized block with cooldowns, otherwise as in the cooled
+alpha sweep (policy 3, C = 1024, 512-token prompt, 2048 decoded tokens, -fa off,
+seed 123, greedy, uninstrumented so the per-step logging does not itself
+drain):
 
-  a0_nodrain    alpha 0.00, drain off  -- the published alpha=0 anchor
-  a0_drain      alpha 0.00, drain ON   -- drain cost alone, no modeled transfer
-  a025_drain    alpha 0.25, drain ON   -- the published alpha=0.25 point
-  a025_nodrain  alpha 0.25, drain off  -- modeled transfer alone, no drain
-  a1_nodrain    alpha 1.00, drain off  -- checks whether drain cost is
-                                          alpha-independent across the range
+  a0_nodrain    alpha 0.00, drain off   the alpha = 0 anchor
+  a0_drain      alpha 0.00, drain on    drain cost alone, no modeled transfer
+  a025_drain    alpha 0.25, drain on    the sweep's alpha = 0.25 point
+  a025_nodrain  alpha 0.25, drain off   modeled transfer alone, no drain
+  a1_nodrain    alpha 1.00, drain off   whether the drain cost is the same
+                                        across the range
 
 Decomposition: drain cost = a0_nodrain - a0_drain; modeled-transfer cost at
-alpha=0.25 = a0_nodrain - a025_nodrain. If the two sum to a0_nodrain - a025_drain
-the effects are additive and the alpha=0 offset splits cleanly.
+alpha = 0.25 = a0_nodrain - a025_nodrain. If the two sum to
+a0_nodrain - a025_drain, the effects add and the alpha = 0 offset splits
+cleanly. Table 7 of the paper lists this block as block 1.
 """
 
 import csv

@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-"""Capacity-bounded overflow: find the C that hardware, not -c, forbids
-(review M2, P1, C4).
+"""Where does device memory, rather than -c, limit the context? An allocation probe.
 
-Every overflow experiment in the paper overflows because -c was set below the
-workload on a 24 GB machine that completes the same workload at C=4096. The
-honest reader's summary is "set -c higher". This probe locates the point where
-that answer runs out: Metal reports a recommendedMaxWorkingSetSize (~17.2 GiB
-of 24 GB on this machine) and the KV cache costs 128 KiB/token for this model
-(32 layers x 8 KV heads x 128 dim x 2 (K+V) x 2 bytes), so a large enough C
-cannot be allocated at all.
+Every overflow experiment in the paper overflows because -c is set below the
+workload, on a machine that completes the same workload at a larger C. This
+probe looks for the point where raising -c stops being an answer. Metal reports
+a working-set budget of 17179.89 MB (16384 MiB) on this 24 GB machine, and the
+KV cache costs 128 KiB per token for this model (32 layers x 8 KV heads x 128
+dims x 2 (K and V) x 2 bytes).
 
-Phase 1  bisect the stock (policy 0) allocation boundary: for each candidate C,
-         load the model with a 1-token generation and record whether allocation
-         succeeded, the KV buffer size, and the Metal working-set line. Cheap --
-         a failing C fails at load.
+Phase 1  bisect the allocation boundary of the unmodified runtime (policy 0):
+         for each candidate C, load the model with a one-token generation and
+         record whether allocation succeeded, the KV buffer size and the Metal
+         working-set line.
+Phase 2  at the same C, check that exact retention (policy 3) loads with device
+         KV bounded at a small resident window while the host tier holds the
+         rest.
+Phase 3  prefill-rate scaling under policy 3, to size an end-to-end run at the
+         boundary rather than guess at it.
 
-Phase 2  at the same C, confirm UniKV (policy 3) loads with device KV bounded at
-         a small resident window while the host tier carries the rest, i.e. the
-         configuration stock cannot express.
+Phase 1 found no allocation boundary: the runtime allocated every candidate up
+to C = 131072, 1.80x the budget, because macOS backs the buffers lazily.
+run_capacity_workload.py and run_f4_phaseA.py then found the limit at
+execution instead (Section 6 of the paper).
 
-Phase 3  prefill-rate scaling under policy 3, used to size (and cost out) an
-         end-to-end run at the boundary rather than guessing at it.
-
-Nothing here is timed against the thermal protocol -- these are allocation
-outcomes and order-of-magnitude rates, not throughput claims.
+Nothing here is timed under the thermal protocol: these are allocation outcomes
+and order-of-magnitude rates, not throughput results.
 """
 
 import csv
@@ -130,7 +131,7 @@ def probe(ctx: int, policy: int, prompt: Path, gen: int, tag: str,
         return cast(m.group(1)) if m else None
 
     # llama.cpp surfaces Metal's budget once per context; a failed KV allocation
-    # shows up as a ggml/metal buffer-allocation error, not as a UniKV message.
+    # shows up as a ggml/metal buffer-allocation error, not as a message from the fork.
     alloc_errors = re.findall(
         r"^.*(?:failed to allocate|ggml_backend_metal_buffer|"
         r"unable to allocate|out of memory|failed to allocate buffer).*$",

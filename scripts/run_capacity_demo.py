@@ -1,37 +1,42 @@
 #!/usr/bin/env python3
-"""A workload where enlarging -c is genuinely unavailable (review M2, P1, C4).
+"""The 65,536-token workload: upstream at default settings, and exact retention.
 
-Established by scripts/run_capacity_probe.py and the bisection in
-artifacts/capacity_probe/bisect.log:
+What the capacity probes established (run_capacity_probe.py,
+run_capacity_workload.py; Section 6 of the paper):
 
-  * Metal reports recommendedMaxWorkingSetSize = 16383 MiB on this 24 GB M4 Pro.
-  * With flash attention off the device working set grows ~193 KiB per token of
-    context: 128 KiB of KV plus ~65 KiB of attention scratch (the explicit
-    n_kv x n_ubatch KQ matrix), on top of 4685 MiB of weights.
-  * Allocation is NOT the binding step -- macOS lazily backs the buffers, so
-    llama.cpp happily "loads" at C=131072 (29537 MiB, 1.72x the budget) and only
-    dies when real work touches the memory.
-  * Processing a 16384-token prompt: C=49152 (14017 MiB, 0.86x) succeeds;
-    C=65536 (17121 MiB, 1.05x) and above fail with
-    kIOGPUCommandBufferCallbackErrorOutOfMemory -- the Metal driver refusing to
-    execute the command buffer, not llama.cpp's cache-full guard.
+  * Metal reports recommendedMaxWorkingSetSize as 17179.89 MB, a 16 GiB
+    (16384 MiB) budget on this 24 GB M4 Pro.
+  * With flash attention off and ubatch 512, the device working set grows by
+    about 194 KiB per context token: 128 KiB of KV and about 66 KiB of
+    attention scratch (the n_kv x n_ubatch KQ matrix), on top of 4685 MiB of
+    weights.
+  * Allocation is not the binding step: macOS backs the buffers lazily, so the
+    runtime loads at C = 131072 (29537 MiB, 1.80x the budget) and fails only
+    when work touches the memory.
+  * Processing a 16384-token prompt, C = 49152 (14017 MiB, 0.86x) succeeds;
+    C = 65536 (17121 MiB, 1.05x) and above fail with
+    kIOGPUCommandBufferCallbackErrorOutOfMemory, the Metal driver refusing the
+    command buffer, not the runtime's cache-full guard.
 
-So stock's maximum WORKABLE context here is between 49152 and 65536 tokens, and
-it is set by hardware, not by the -c flag. This script runs a workload above
-that ceiling, where every stock configuration fails for a different reason and
-neither failure can be fixed by choosing a different -c:
+This script runs a 65536-token prompt (UNIKV_CD_PROMPT) under three arms:
 
-  A  stock at C=49152   the largest context that actually runs -> the prompt no
-                        longer fits, rejected by the length guard
-  B  stock at C=73728   a context that WOULD fit the prompt -> GPU out of memory
-  C  UniKV at C=4096    bounded device window plus a host tier -> completes
+  A  upstream at C = 49152   the largest context that runs at ubatch 512 with
+                             flash attention off; the prompt does not fit, and
+                             the length guard rejects it
+  B  upstream at C = 73728   a context that holds the prompt; refused for
+                             device memory at these settings
+  C  exact retention at C = 4096, with a host tier for the rest; completes
 
-This is the configuration the review says the paper lacks: "one overflow that
-hardware, not -c, causes".
+At these settings neither upstream arm completes. Later runs in
+run_f4_phaseA.py found two upstream configurations that do: ubatch 64 at
+C = 81920 with flash attention off, and ubatch 512 at C = 73728 with it on
+(Table 6). The limit comes from the budget and the micro-batch, not from the
+policy.
 
-Protocol: -fa off, -fit off, greedy (temp 0), seed 123, -b/-ub 512.
-The UniKV arm is slow by design -- the spilled tier is attended on the CPU and
-prefill through it grows superlinearly (~N^1.76 measured). Budget ~1 hour.
+Protocol: -fa off, -fit off, greedy (temperature 0), seed 123, -b/-ub 512. The
+exact-retention arm is slow: its spilled tier is attended on the CPU, and
+prefill through it grows superlinearly (about N^1.76 measured). Allow about an
+hour.
 """
 
 import csv
@@ -136,7 +141,7 @@ def run_arm(prompt: Path, tag: str, ctx: int, policy: int, cap, role: str) -> di
     model = g(r"MTL0_Mapped model buffer size\s*=\s*([\d.]+)", float)
     comp  = g(r"MTL0 compute buffer size\s*=\s*([\d.]+)", float)
     budget_mb = g(r"recommendedMaxWorkingSetSize\s+=\s+([\d.]+)", float)
-    # ggml prints this in DECIMAL MB; our footprints are MiB. Convert, or every
+    # ggml prints this in decimal MB; our footprints are MiB. Convert, or every
     # ratio comes out 4.9% low.
     budget = budget_mb * 1e6 / 2**20 if budget_mb else None
     device_total = sum(x for x in (kv, model, comp) if x)

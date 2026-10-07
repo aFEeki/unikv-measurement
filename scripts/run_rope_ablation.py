@@ -1,37 +1,35 @@
 #!/usr/bin/env python3
-"""Item 1 — the RoPE ablation. Is the K-shift re-encode really Finding 5's mechanism?
+"""RoPE ablation: is re-encoding the cause of the rolling window's extra cost?
 
-Finding 5 says the rolling window costs more than H2O because llama.cpp calls
+The rolling window costs more than H2O. The explanation was that llama.cpp calls
 seq_add on every overflow, which renumbers the surviving cells and forces a
 rotary re-encode across the whole cache, while H2O drops cells and touches no
-positions. That attribution is read off the code path; nothing measures it.
+positions. That attribution was read off the code path, not measured.
 
-UNIKV_NO_REENCODE=1 (added in llama-kv-cache.cpp::update) skips ONLY the K-shift
+UNIKV_NO_REENCODE=1 (in llama-kv-cache.cpp::update) skips only the K-shift
 graph. Eviction, the position renumbering, the head fix-up and reset_shift() all
 still run, so the difference between the normal and ablated arms is the cost of
 that one operation.
 
-THE ABLATED ARM PRODUCES WRONG OUTPUT. Survivors keep positions that no longer
-match their rotary encoding. Verified: its tokens are identical to the normal
-arm's up to the first overflow and diverge from exactly that point. It is an
-INSTRUMENT, not a policy; its text is never reported as a quality result.
+The ablated arm produces wrong output: survivors keep positions that no longer
+match their rotary encoding. Its tokens match the normal arm's up to the first
+overflow and diverge from exactly that point. It is an instrument, not a policy,
+and its text is never reported as a quality result.
 
-THE PREDICTION, stated before the run (cooled b2 block, C=1024):
-    policy 1  39.40 tok/s     H2O  42.42 tok/s     gap 3.02 (7.7%)
-  If the attribution is right, p1_noreencode should recover most of that gap and
-  land near H2O. If it recovers little, the re-encode is NOT the mechanism and
-  Finding 5's explanation is wrong — which is the more interesting outcome and is
-  reported as it lands.
+The prediction, stated before the run, from block 2 of run_b2_cooled.py at
+C = 1024: policy 1 at 39.40 tok/s, H2O at 42.42, a gap of 3.02 (7.7%). If the
+attribution is right, p1_noreencode recovers most of that gap and lands near
+H2O; if it recovers little, re-encoding is not the main cause. It recovers 35%
+at C = 1024 (Appendix B of the paper).
 
-DESIGN: randomised COMPLETE block. Three rounds; each round is a random
-permutation of all eight (arm, ctx) cells. Every arm therefore appears exactly
-once per third of the session, so arm is orthogonal to block position BY
-CONSTRUCTION rather than by a lucky shuffle — the drain-alpha block relied on the
-shuffle, drew a bad layout, and survived only on post-hoc checks.
+Design: randomized complete block, three rounds, each a random permutation of
+all eight (arm, ctx) cells, so every arm appears once per third of the session
+and arm is orthogonal to block position by construction. The drain-by-alpha
+block relied on a plain shuffle, drew a bad layout, and needed post-hoc checks.
 
-Protocol otherwise identical to b2 block 2: 512-token prompt, 2048 decode,
-C in {1024, 2048}, -b/-ub 512, -fa off parsed back per run, greedy, seed 123,
-EOS disabled, uninstrumented, 200 s cooldowns.
+Protocol otherwise as in block 2 of run_b2_cooled.py: 512-token prompt, 2048
+decoded tokens, C in {1024, 2048}, -b/-ub 512, -fa off parsed per run, greedy,
+seed 123, EOS disabled, uninstrumented, 200 s cooldowns.
 """
 
 import csv, datetime, math, os, random, re, statistics as st, subprocess, sys, time
@@ -95,7 +93,7 @@ def ensure_prompt(n):
 
 
 def build_plan():
-    """Randomised complete block: each round is a permutation of all 8 cells."""
+    """Randomized complete block: each round is a permutation of all 8 cells."""
     cells = [(a, c) for a in ARMS for c in CTXS]
     rng, plan = random.Random(SHUFFLE), []
     for r in range(1, TRIALS + 1):

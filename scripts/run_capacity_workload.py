@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-"""Does an over-large context actually cost anything? (review M2, P1, C4;
-instantiates the paper's "Why not simply enlarge the cache?" argument.)
+"""Does an over-large context cost anything? One workload at three provisionings.
 
-Phase 1 of run_capacity_probe.py returned a negative result: on this machine
-stock llama.cpp ALLOCATES a 131072-token context without failing, 29537 MiB of
-device buffers against a 16383 MiB recommendedMaxWorkingSetSize. Metal's budget
-is advisory and macOS over-commits unified memory, so the allocation failure the
-review hypothesised does not occur here.
+run_capacity_probe.py's first phase found that the unmodified runtime allocates
+a 131072-token context without failing: 29537 MiB of device buffers against the
+16384 MiB advisory budget. The budget is advisory and macOS backs unified memory
+lazily, so the allocation failure the probe looked for does not happen here.
 
-That leaves the interesting question. The paper's Discussion answers "why not
-just raise -c" with three arguments and instantiates none of them. Raising -c
-costs device memory in two ways that both scale with C: the KV cache (128
-KiB/token) and, with flash attention off, the attention scratch (the explicit
-n_kv x n_ubatch KQ matrix). This measures whether paying that costs throughput
-on an IDENTICAL workload.
+That leaves the question of cost. Raising -c costs device memory in two ways
+that both scale with C: the KV cache (128 KiB per token) and, with flash
+attention off, the attention scratch (the n_kv x n_ubatch KQ matrix). This
+script measures whether paying that changes throughput on an identical
+workload. Three arms, the same 16384-token prompt and short decode:
 
-Three arms, same 16384-token prompt and same short decode:
-  A  stock at C=32768    -- comfortably provisioned (~11 GiB device)
-  B  stock at C=131072   -- same workload, over-provisioned (~29.5 GiB device,
-                            1.8x the advisory budget)
-  C  UniKV at C=4096 with a host tier sized for 131072 cells (~5.5 GiB device)
+  A  upstream at C = 32768    comfortably provisioned (about 11 GiB of device)
+  B  upstream at C = 131072   the same workload, over-provisioned (about
+                              29.5 GiB of device, 1.8x the advisory budget)
+  C  exact retention at C = 4096, with a host tier sized for 131072 cells
+     (about 5.5 GiB of device)
 
-A vs B isolates the cost of an over-large C at fixed work. B vs C is the
-capacity comparison at matched capability: both can hold 131072 tokens, but only
-one keeps the device working set inside the budget.
+A against B isolates the cost of an over-large C at fixed work. B against C
+compares two ways of holding 131072 tokens, only one of which keeps the device
+working set inside the budget. Once the prompt touches the memory, the
+over-provisioned configuration is refused at execution (Table 5 of the paper).
 """
 
 import csv
@@ -135,7 +133,7 @@ def run_arm(prompt: Path, tag: str, ctx: int, policy: int, cap, role: str) -> di
     comp  = g(r"MTL0 compute buffer size\s*=\s*([\d.]+)", float)
     host  = g(r"host spill store\s*=\s*([\d.]+)\s+MiB", float)
     budget_mb = g(r"recommendedMaxWorkingSetSize\s+=\s+([\d.]+)", float)
-    # ggml prints this in DECIMAL MB; our footprints are MiB. Convert, or every
+    # ggml prints this in decimal MB; our footprints are MiB. Convert, or every
     # ratio comes out 4.9% low.
     budget = budget_mb * 1e6 / 2**20 if budget_mb else None
     pe_ms = g(r"prompt eval time =\s+([\d.]+) ms", float)

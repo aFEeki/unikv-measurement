@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-"""Controls for M2 — is the measured delta-logit the SPILL, or just graph shape?
+"""Controls for the logit bound: is the measured difference the spill, or graph shape?
 
-The main M2 run compares a C=8192 reference against C=1024 retention arms. Those
-differ in TWO ways: the spill mechanism, and the size of the attention window,
-which changes the shape of the reduction and therefore the float summation order.
-Non-associativity alone can move a logit. A raw delta-logit from that comparison
-attributes to the spill something that may just be arithmetic reordering.
+The main logit run compares a C = 8192 reference against C = 1024 retention
+arms. Those differ in two ways: the spill mechanism, and the size of the
+attention window, which changes the shape of the reduction and so the order of
+the floating-point sums. Non-associativity alone can move a logit, so a raw
+difference from that comparison might attribute reordering to the spill.
 
-Three controls, all on the passkey prompt, all -fa off, greedy, seed 123:
+Three controls, all on the passkey prompt, -fa off, greedy, seed 123:
 
-  A. DETERMINISM   policy 0 C=8192, run twice, identical settings.
-                   Must be exactly 0. If it is not, nothing else here means
-                   anything.
-  B. GRAPH SHAPE   policy 0 C=8192 vs policy 0 C=4096, NO SPILL ANYWHERE, over
-                   the 262 generated tokens before C=4096 fills. Any delta here
-                   is pure cache-size / reduction-order effect. This is the
-                   number the retention arms must be compared AGAINST, not zero.
-  C. TIER          policy 3 CPU-pinned vs policy 3 device-visible, both C=1024,
-                   same spilled set. Isolates the tier placement from the
-                   spill itself.
+  A  determinism   policy 0 at C = 8192, run twice with identical settings. The
+                   difference must be exactly 0; if it is not, nothing else
+                   here means anything.
+  B  graph shape   policy 0 at C = 8192 against policy 0 at C = 4096, nothing
+                   spilled, over the 262 tokens before C = 4096 fills. Any
+                   difference here is a cache-size or reduction-order effect,
+                   and it is the floor the retention arms are compared against.
+  C  tier          policy 3 CPU-pinned against policy 3 device-visible, both at
+                   C = 1024 with the same spilled set. Separates tier placement
+                   from the spill itself.
+
+Control B came out bitwise identical at every one of the 262 steps (Section 5
+of the paper).
 """
 
 import os, re, subprocess, sys, array

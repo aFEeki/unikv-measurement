@@ -1,43 +1,42 @@
 #!/usr/bin/env python3
-"""Figure 7 for the measurement paper — an injected delay is invisible undrained.
+"""Drain figure from an earlier draft (fig7_drain); the paper does not use it.
 
-Finding 3's most surprising result is currently a five-row table the reader has
-to do arithmetic on. The figure states it directly: with the pipeline drained,
-the modelled transfer cost shows up; without the drain, the same injected sleep
-is absorbed by asynchronous execution and barely registers.
+An injected delay is nearly invisible without the pipeline drain. With the
+drain, the modeled transfer cost shows up; without it, the same injected sleep
+is absorbed by asynchronous execution. The paper states this result in
+Appendix A and Table 7 instead.
 
-PROVENANCE DECISION: this plots the drain-control block ALONE
-(alpha_results/p3_drain_control_master.csv). The cooled alpha sweep has a fuller
-drained curve (alpha 0 through 2) and the two blocks share an alpha=0 undrained
-point agreeing to 0.30%, so overlaying was on the table. It was rejected:
+Source: the drain-control block alone (alpha_results/p3_drain_control_master.csv).
+The cooled alpha sweep has a fuller drained curve (alpha 0 to 2), and the two
+blocks share an alpha = 0 undrained point that agrees to 0.30%, so overlaying
+them was considered and rejected:
 
-  - the two blocks agree on LEVEL but disagree on SLOPE. The drain-control's
+  - The two blocks agree on level but not on slope. The drain-control block's
     drained segment falls at -1.991 +/- 0.300 tok/s per unit alpha; the cooled
-    sweep's drained fit is -1.197 +/- 0.052 over alpha 0.25-2. That is t = -2.6.
-  - this figure's whole claim is that two series differ in SLOPE, so agreement
-    on level at one anchor does not license the splice. A combined drained
-    series would carry a kink at alpha=0.25 that no reader could attribute to
-    curvature rather than to the block change.
-  - the within-block contrast is in any case the stronger statistic: at the one
+    sweep's drained fit is -1.197 +/- 0.052 over alpha 0.25 to 2 (t = -2.6).
+  - The figure's claim is that two series differ in slope, so agreement on
+    level at one point does not justify combining them. A combined drained
+    series would have a kink at alpha = 0.25 that a reader could not attribute
+    to curvature rather than to the change of block.
+  - The within-block contrast is the stronger statistic anyway: at the one
     alpha where both conditions were measured, undrained minus drained is
-    +0.713 +/- 0.068 tok/s, t = 10.5.
+    +0.713 +/- 0.068 tok/s (t = 10.5).
 
-So the left-hand quarter of the x range carries the comparison and the drained
-series stops where the data stops, which is marked on the plot.
+So the left quarter of the x range carries the comparison, and the drained
+series stops where the data stops, which the plot marks.
 
-HONESTY NOTE ON "FLAT": the undrained series is NOT flat. Over alpha 0 to 1 it
-falls 0.541 +/- 0.183 tok/s (t = -3.0), a real 1.8% decline. What the figure
-shows is that it is much SHALLOWER: -0.588 against -1.991 tok/s per unit alpha,
-a factor of 3.4. The labels say so rather than claiming flatness.
+The undrained series is not flat. Over alpha 0 to 1 it falls 0.541 +/- 0.183
+tok/s (t = -3.0), a 1.8% decline. The figure shows that it is much shallower,
+-0.588 against -1.991 tok/s per unit alpha, a factor of 3.4, and its labels say
+so rather than calling it flat.
 
-AXIS: y is truncated. The claim is a difference in slope, not the size of a
-ratio, and the whole effect spans 0.7 tok/s out of ~29.5, so a zero baseline
-would render it invisible. The truncation is marked with a break glyph on the
-axis.
+The y axis is truncated, with a break mark: the claim is a difference in slope,
+and the whole effect spans 0.7 tok/s out of about 29.5, which a zero baseline
+would hide.
 
-Every plotted value is asserted against the CSV.
-Writes figures/fig7_drain.{pdf,png} and copies the PDF to
-paper/UNIKV-MEASUREMENT/.
+Every plotted value is asserted against the CSV. Writes
+figures/fig7_drain.{pdf,png}, and copies the PDF into paper/UNIKV-MEASUREMENT/
+if that directory exists.
 """
 
 import csv
@@ -57,7 +56,7 @@ PAPER_DIR = ROOT / "paper" / "UNIKV-MEASUREMENT"
 
 TOL = 0.0015
 
-# ---- LOCKED (drain-control block; condition -> alpha, mean, sd) ------------
+# ---- locked values (drain-control block; condition -> alpha, mean, sd) -----
 UNDRAINED = [(0.00, 29.762, 0.281, "a0_nodrain"),
              (0.25, 29.781, 0.110, "a025_nodrain"),
              (1.00, 29.221, 0.145, "a1_nodrain")]

@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""UniKV R2 re-runs on policy 3 (lossless spill-and-recall).
+"""Early policy-3 runs: a policy comparison and the idle overhead.
 
-Run 1  policy comparison, C in {1024, 2048}: baseline p0 vs UniKV p3, on a
-       512-token prompt + 2048-token decode budget. Baseline halts at cache
-       full; p3 completes the full budget. Records decoded-token count and
-       e2e tok/s for both arms, plus p3 spill events + retained cells.
+Run 1  policy comparison, C in {1024, 2048}: the unmodified runtime (p0) against
+       exact retention (p3), on a 512-token prompt with a 2048-token decode
+       budget. p0 halts when the cache fills; p3 completes the budget. Records
+       the decoded-token count and e2e tok/s for both arms, plus p3's spill
+       events and retained cells.
 
-Run 3  no-overhead reference, C=4096: p3 idle (nothing spills) vs p0 stock,
-       2048 decode rows. The real idle overhead of policy 3, replacing 0.77%.
+Run 3  idle overhead, C = 4096: p3 with nothing spilled against p0, 2048 decoded
+       tokens, to measure what policy 3 costs when it does nothing.
 
-All arms: -fa off, greedy, seed 123, --ignore-eos, single clean process each,
-run sequentially so thermal state does not leak between arms.
+All arms: -fa off, greedy, seed 123, --ignore-eos, one process each, run
+sequentially and uncooled, alpha = 0 everywhere. Writes r2_* files and leaves
+the other stress_results CSVs alone.
 
-Does NOT touch the alpha model (alpha=0 everywhere here). Does NOT overwrite the
-locked stress_results CSVs -- writes r2_* names.
+The cooled blocks in run_b2_cooled.py replaced these numbers.
 """
 
 import csv

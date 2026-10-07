@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
-"""M2 follow-up — flip margins SPLIT BY TIER, and whether eps grows with step.
+"""Logit perturbation against the reference's top-two margin, per tier.
 
-Two questions the pooled numbers could not answer:
+Reads the raw logit dumps written by run_logit_bound.py: artifacts/logit_bound/
+for Llama 3.1 8B, or artifacts/logit_bound_<tag>/ with UNIKV_LOGIT_TAG. The
+dumps are about 2 GB per model and are not in the archive; the CSVs this script
+writes are. Three questions, per prompt and arm:
 
-1. Is device-visible actually the SAFER tier, or merely the less-perturbed one?
-   Pooling min-margin across tiers cannot tell those apart. If device-visible's
-   worst margin is also ~0.005 then both tiers sit equally close to a flip and
-   the honest move is to downgrade both, not to recommend one.
+1. How close does each tier come to a flip? Pooling across tiers cannot tell a
+   tier that is perturbed less from one that is safer, so each tier is reported
+   separately: min(m - 2*eps) and the number of steps with m <= 2*eps, where m
+   is the reference's top1-top2 margin at that step and eps the arm's max
+   |delta logit|. m <= 2*eps is the conservative flip condition: a
+   perturbation of size eps applied against both the winner and the runner-up
+   closes a margin of 2*eps.
 
-   Reported per tier: min(m - 2*eps) and the count of steps with m <= 2*eps,
-   where m is the REFERENCE's top1-top2 margin at that step and eps is the arm's
-   max |delta logit| at that step. m <= 2*eps is the conservative flip condition:
-   a perturbation of size eps applied adversarially to both the winner and the
-   runner-up closes a margin of 2*eps.
+2. Does eps grow with step index, that is, with how long the spilled tier has
+   been accumulating? A flat eps points at a fixed reassociation difference; a
+   growing one points at accumulation and predicts failures at horizons longer
+   than 512.
 
-2. Does eps grow with step index — i.e. with how long the spilled tier has been
-   accumulating? Flat points at a fixed reassociation difference. Growing points
-   at accumulation and predicts failure at longer horizons than 512.
+3. How far does the perturbation actually move the reference's top-two margin?
+   The shift is (arm[i] - arm[j]) - (ref[i] - ref[j]) for the reference's top
+   two tokens i and j, reported up to the first step where the arm's argmax
+   leaves the reference's (all steps if it never does), with the margin and the
+   shift at that step. After it the two runs condition on different tokens and
+   are no longer comparable.
 
-3. Did the perturbation actually move the reference's top-two margin? max
-   |delta logit| over the vocabulary bounds the shift; the shift itself is
-   (arm[i] - arm[j]) - (ref[i] - ref[j]) for the reference's top two tokens i
-   and j. Reported up to the first step where the arm's argmax leaves the
-   reference's (all steps if it never does), with the margin and shift at that
-   step. After it the two runs condition on different tokens and stop being
-   comparable.
-
-No new runs: this reads the dumps already in artifacts/logit_bound/.
+No new runs.
 """
 
 import csv, os, sys

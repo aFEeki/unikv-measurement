@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Reconstruction acceptance by INTERVAL, not by a point band.
+"""Check the rebuilt re-encoding gate against the published ablation, by interval.
 
-Per-event cost is a difference of two noisy means divided by an event count, so a
-point band on it mis-states the test: the estimator's spread can exceed the band
-width, which is what made the first check unresolvable. The test is therefore:
+Per-event cost is a difference of two noisy means divided by an event count, so
+a point band on it misstates the test: the estimator's spread can exceed the
+band, which left the first check unresolved. The test is instead:
 
-  PASS  the block's 95% interval on per-event cost contains the published value
-        at BOTH budgets
-  FAIL  either budget excludes the published value WITH TIGHT BARS
+  pass  the block's 95% interval on per-event cost contains the published value
+        at both cache sizes
+  fail  either cache size excludes the published value with a tight interval
 
-and the C=2048/C=1024 per-event RATIO is judged the same way against the
-published 1.961 and against the 2.000 that "the K-shift re-encodes the whole
-resident cache" predicts. Section 8's attribution rests on that ratio.
+The C=2048 / C=1024 per-event ratio is judged the same way, against the
+published 1.961 and against the 2.000 that re-encoding the whole resident cache
+predicts. Appendix B's attribution of the window's cost rests on that ratio.
 
-Intervals by Monte Carlo over the two arm means (normal, mean and standard error
-from the block), which propagates the reciprocal and the difference correctly
-without a delta-method approximation.
+Intervals come from Monte Carlo over the two arm means (normal, with mean and
+standard error from the block), which propagates the reciprocal and the
+difference without a delta-method approximation.
 
   python3 scripts/analyze_reconstruction.py <csv> [<csv> ...]
 """

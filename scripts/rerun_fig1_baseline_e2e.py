@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-"""
-Re-run Figure 1's baseline decode-throughput-vs-context curve through the SAME
-fixed end-to-end harness used by the stress and alpha sweeps, so every figure
-reports the identical primary metric.
+"""Baseline decode throughput against context, for an earlier draft's Figure 1.
 
-Figure 1 workload (unchanged from run_m4pro_baseline.py): a near-full context
-is filled by a prompt of (ctx - GEN_TOKENS) tokens, then GEN_TOKENS are decoded.
-UNIKV_POLICY=0 (baseline). Contexts C in {4096, 8192, 16384, 32768}.
+Re-runs the curve through the same end-to-end harness as the stress and alpha
+sweeps, so every figure of that draft reports the same metric. The paper does
+not use it.
 
-Metric: end-to-end decode tok/s = decode tokens / decode wall-clock, with one
-synchronize() after the generation loop and prefill excluded (via UNIKV_E2E_LOG,
-captured by llama-completion). We ALSO record common_perf_print's eval-time
-tok/s as a cross-check -- that path was already GPU-synced (t_eval_us is
-accumulated inside synchronize()), so it is the old Figure 1 number and should
-sit slightly ABOVE e2e (e2e additionally includes per-token sampling overhead).
+Workload (as in run_m4pro_baseline.py): a prompt of (ctx - GEN_TOKENS) tokens
+fills most of the context, then GEN_TOKENS are decoded. UNIKV_POLICY=0, the
+unmodified runtime. Contexts C in {4096, 8192, 16384, 32768}.
 
-Output: baseline_m4pro_e2e.csv  (one row per context).
-Guardrail: any e2e tok/s >= CEILING is flagged and NOT reported.
+Metric: end-to-end decode tok/s, decode tokens over decode wall-clock, with one
+synchronize() after the generation loop and prefill excluded (UNIKV_E2E_LOG,
+written by llama-completion). It also records common_perf_print's eval-time
+tok/s as a cross-check: that path is already GPU-synchronized (t_eval_us
+accumulates inside synchronize()), so it should sit slightly above e2e, which
+also includes per-token sampling.
+
+Output: baseline_m4pro_e2e.csv, one row per context. Any e2e tok/s at or above
+CEILING is flagged and not reported.
 """
 
 from __future__ import annotations

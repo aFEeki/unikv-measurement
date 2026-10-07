@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Count the ggml scheduler's graph splits in the two-tier attention path.
 
-This is a STRUCTURAL census, not a timing measurement. The split count is a
+This is a structural census, not a timing measurement. The split count is a
 property of the graph the scheduler builds for a given (model, tier placement),
 so it is deterministic and does not need the cooled randomized-block protocol
 of Section 3: no cooldowns, no repeats, no randomization, and a warm machine is
@@ -99,7 +99,7 @@ def run(label, gguf, dev):
 
     # The first build predates the first demotion and is single-tier; the last
     # follows it and is two-tier. Comparing first to last rather than counting
-    # distinct sizes keeps the case where the two are EQUAL, which is the
+    # distinct sizes keeps the case where the two are equal, which is the
     # device-visible result and would otherwise read as missing data. It is
     # only meaningful if the run actually spilled, so that is asserted.
     if not spills:

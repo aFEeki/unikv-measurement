@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
-"""Fit the recall-cost curve produced by run_recall_cost_sweep.py.
+"""Fit the recall-cost curve from run_recall_cost_sweep.py's long runs.
 
 Model. A decode step under policy 3 attends over the resident window plus the
 whole spilled tier, so the natural form is
 
     t_step(n_spill) = t_gpu + f * [n_spill > 0] + b * n_spill
 
-  t_gpu  cost of the resident-only step (the GPU path, no spilled tier)
+  t_gpu  cost of the resident-only step
   f      fixed cost of entering the two-tier path at all (the CPU-pinned
-         spilled matmuls, their graph nodes and the concat/softmax over the
-         union) -- paid as soon as anything has spilled
+         spilled matmuls, their graph nodes, and the concatenation and softmax
+         over the union), paid as soon as anything has spilled
   b      marginal cost per spilled cell
 
-Separating f from b matters for the paper's cost model: a large f with a small
-b says the recall cost is dominated by a per-step constant of the
-implementation, not by the size of the retained set, which is what decides
-whether the policy survives 10^4-10^5-token contexts.
+f and b answer different questions: a large f with a small b means the cost is
+mostly a per-step constant of the implementation rather than a function of how
+much is retained.
 
 Thermal correction. In the policy-3 run n_spill grows monotonically with time,
-so on a passively cooled device thermal droop aliases straight onto b. The
-policy-1 control run does constant work per step at the same resident size, so
-its ms/step against elapsed time measures the droop alone. That drift is fitted
-against WALL-CLOCK seconds (not step index, since the two runs advance through
+so on a passively cooled device thermal droop aliases onto b. The policy-1
+control run does constant work per step at the same resident size, so its
+ms/step against elapsed time measures the droop alone. That drift is fitted
+against wall-clock seconds (not step index, since the two runs advance through
 time at different rates) and subtracted before b is refitted.
+
+The paper quotes this single-run slope only to show that it is confounded with
+heating; its coefficients come from the isochronal blocks.
 """
 
 import csv
@@ -113,7 +115,7 @@ def main() -> int:
         f"n_spill {min(r['n_spill'] for r in post)}..{max(r['n_spill'] for r in post)}")
     say()
 
-    # binned view: honest look at the shape before any fit is imposed on it
+    # binned view: the shape before any fit is imposed on it
     say("  n_spill bin        steps   mean ms   tok/s")
     nmax = max(r["n_spill"] for r in post)
     edges = [1, 256, 512, 1024, 2048, 4096, 6144, 8192, 10240, 12288, 16384]
@@ -309,10 +311,9 @@ def main() -> int:
         ax.set_ylim(bottom=0)
         ax.legend(loc="upper left", frameon=False)
         FIG_DIR.mkdir(parents=True, exist_ok=True)
-        # NOT fig5_recall_cost: that name now belongs to the two-series figure
-        # built by scripts/make_fig5_recall_cost.py from the B2 Block-1 data,
-        # which is the one the measurement paper includes. This single-series
-        # plot is retained for the older CPU-pinned-only analysis only.
+        # Not fig5_recall_cost: that name belongs to the two-tier figure from
+        # make_fig5_recall_cost.py, which the paper uses. This single-series
+        # plot belongs to the earlier CPU-pinned-only analysis.
         fig.savefig(FIG_DIR / "fig5_recall_cost_cpuonly_superseded.pdf")
         fig.savefig(FIG_DIR / "fig5_recall_cost_cpuonly_superseded.png")
         plt.close(fig)

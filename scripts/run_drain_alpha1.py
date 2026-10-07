@@ -1,47 +1,47 @@
 #!/usr/bin/env python3
-"""Is the pipeline-drain cost alpha-independent? The 2x2 the first block skipped.
+"""Is the pipeline-drain cost the same at every alpha? The missing cell of the 2x2.
 
-The paper decomposes the alpha=0 -> alpha=0.25 step into a drain part and a
-modeled-transfer part (the 71/29 split) and, in doing so, assumes the drain cost
-is the same at every alpha. The first drain-control block never tested that: it
-measured drain cost only at alpha=0, and its only alpha=1 point was UNDRAINED.
+An earlier draft split the step from alpha = 0 to alpha = 0.25 into a drain
+part and a modeled-transfer part (71/29), which assumes the drain costs the
+same at every alpha. The first drain-control block never tested that: it
+measured the drain only at alpha = 0, and its only alpha = 1 point was
+undrained.
 
-This block closes the 2x2:
+This block runs all four cells:
 
-                       drain OFF            drain ON
+                       drain off            drain on
     alpha = 0.00       a0_nodrain           a0_drain
     alpha = 1.00       a1_nodrain           a1_drain     <- the missing cell
 
-  drain cost at alpha=0  =  a0_nodrain - a0_drain
-  drain cost at alpha=1  =  a1_nodrain - a1_drain
+  drain cost at alpha = 0  =  a0_nodrain - a0_drain
+  drain cost at alpha = 1  =  a1_nodrain - a1_drain
 
-If those two agree, the decomposition is validated and the 71/29 split stands as
-written. If the drain cost scales with alpha, the split is alpha-specific and the
-paper has to say at which alpha it holds.
+If the two agree, the decomposition holds as written; if the drain cost scales
+with alpha, the split is specific to one alpha. It does scale: Appendix A of
+the paper reports the interaction.
 
-WHY ALL FOUR CELLS AND NOT JUST THE ONE MISSING ARM. The standing rule is no
-splicing across blocks. a1_nodrain already exists in
-alpha_results/p3_drain_control_master.csv, but subtracting a new a1_drain from
-THAT mean would be a cross-block contrast of exactly the kind the fig7 provenance
-note rejected -- the two blocks there agreed on level to 0.3% and disagreed on
-slope at t=2.6. Both differences this block reports are therefore within-block.
-Re-measuring the alpha=0 pair costs six runs and buys an independent replication
-of the published drain cost, which is worth having on its own.
+All four cells are run, not just the missing one, because subtracting a new
+a1_drain from the earlier block's a1_nodrain
+(alpha_results/p3_drain_control_master.csv) would be a cross-block contrast:
+the drain-control block and the cooled sweep agreed on level to 0.3% but
+disagreed on slope at t = 2.6. Both differences reported here are within one
+block, and re-measuring the alpha = 0 pair costs six runs and replicates the
+earlier drain cost independently.
 
-Protocol identical to the first drain-control block: policy 3, C=1024, 512-token
-prompt, 2048 decoded tokens, -fa off, seed 123, greedy, EOS disabled,
-UNINSTRUMENTED (UNIKV_LOG itself synchronizes at both ends of every decode call,
-which would drain the pipeline in the arms whose whole point is that they do
-not). Randomized block with cooldowns; a different shuffle seed, so this is a
-fresh randomization rather than a replay of the first block's order.
+Protocol as in the first drain-control block: policy 3, C = 1024, 512-token
+prompt, 2048 decoded tokens, -fa off, seed 123, greedy, EOS disabled, and
+uninstrumented, because UNIKV_LOG synchronizes at both ends of every decode
+call and would drain the arms that must not drain. Randomized block with
+cooldowns and a different shuffle seed, so this is a fresh randomization
+rather than a replay of the first block's order.
 
-UNIKV_DRAIN semantics (from llama-context.cpp):
-  unset -> drain iff alpha > 0   (the published behavior)
+UNIKV_DRAIN (llama-context.cpp):
+  unset -> drain if alpha > 0 (the default)
   1     -> drain even at alpha = 0
   0     -> never drain, even at alpha > 0
-So the two DRAINED conditions are reached differently -- alpha=1 drains by
-default, alpha=0 needs the override -- and each condition's setting is recorded
-per run so the CSV carries the evidence rather than the harness source.
+The two drained conditions are reached differently (alpha = 1 drains by
+default, alpha = 0 needs the override), and each run records its setting, so
+the CSV carries the evidence rather than the harness source.
 """
 
 import csv

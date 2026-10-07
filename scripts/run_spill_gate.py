@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
-"""UniKV Phase 1 (policy 3) acceptance gate — lossless spill-and-recall.
+"""Acceptance gate for exact retention (policy 3): lossless spill and recall.
 
-Four recorded arms, identical prompt / seed / greedy decode / -fa off:
+Four arms, with the same prompt, seed, greedy decoding and -fa off:
 
-  1  p0 @ C=4096  stock, UniKV off        -> reference truth
-  2  p3 @ C=4096  UniKV, nothing spills   -> p3 is inert when idle (no regression)
-  3  p3 @ C=1024  heavy spill             -> losslessness under real pressure
-  4  p1 @ C=1024  naive rolling eviction  -> loss control
+  1  p0 at C = 4096   unmodified runtime         the reference
+  2  p3 at C = 4096   retention, nothing spills  policy 3 is inert when idle
+  3  p3 at C = 1024   heavy spilling             exactness under real pressure
+  4  p1 at C = 1024   naive rolling eviction     the loss control
 
-Gates:
-  arms 1, 2, 3 emit IDENTICAL sampled-token-ID sequences and all retrieve the
-  passkey; arm 4 loses it. Every arm's decode rate must sit under the ~58 tok/s
-  unified-memory ceiling.
+Gates: arms 1, 2 and 3 emit identical sampled-token-ID sequences and all
+retrieve the passkey; arm 4 loses it. Every arm's decode rate must stay under
+the 58 tok/s ceiling.
 
 Exactness is compared on the token IDs sampled at each step (UNIKV_TOKEN_LOG),
-not on re-encoded output text -- re-tokenizing the strings would only compare
-strings again.
+not on re-encoded output text, which would only compare strings again.
 
-A mismatch among arms 1/2/3 is NOT a number to average away: seed + greedy
-decoding is deterministic, so a mismatch means nondeterminism in the spill
-path, which is itself a finding. The script fails loudly.
+A mismatch among arms 1, 2 and 3 is not a number to average away: greedy
+decoding at a fixed seed is deterministic, so a mismatch would mean
+nondeterminism in the spill path. The script stops on it.
 
-Also records, per arm, the device-side KV buffer (memory_breakdown), which is
-what distinguishes real spill (device KV = O(C)) from retention (O(N)).
+It also records each arm's device-side KV buffer from the memory breakdown,
+which distinguishes a real spill (device KV grows as O(C)) from plain retention
+(O(N)).
 
-Ingest uses the batched long-prompt path validated byte-identical in Path B Gate-1.
+Prompts are ingested through the batched long-prompt path that
+run_quality_probe_A.py's Gate 1 checked.
 """
 
 import csv

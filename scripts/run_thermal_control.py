@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-"""Item 3 — the constant-work thermal control. Converts a bound into a measurement.
+"""Constant-work thermal control for the isochronal block.
 
-Section 4 reports both per-cell terms as UPPER BOUNDS because part of the
-measured step-time rise with n_spill could be heat rather than recall: a run at a
-large spill target spends far longer under load before its measurement window
-opens, so the machine is hotter when the window is measured.
+A run at a large spill target spends far longer under load before its
+measurement window opens, so the machine is hotter when that window is
+measured, and part of the measured rise of step time with n_spill could be heat
+rather than recall. Without this control, Section 4 of the paper could only
+treat both per-cell terms as upper bounds.
 
-THE CONTROL: policy 1 at a pinned C=1024 window does CONSTANT work per step and
-spills nothing. Run it for the same elapsed time and read its step time over the
-same wall-clock band; whatever it has drifted is thermal, because nothing else
-about its work has changed.
+The control: policy 1 with the window pinned at C = 1024 does constant work per
+step and spills nothing. Run it for the same elapsed time and read its step
+time over the same wall-clock band; whatever it has drifted is thermal, because
+nothing else about its work has changed.
 
-MATCHED ON ELAPSED WALL-CLOCK, NOT ON STEP COUNT. The brief says burst duration;
-the timeline says it has to be more than that. The bursts themselves are 2.2-5.5 s
-and differ little across targets, but the PROCESS durations are 4.7 s to 94.3 s
-(CPU-pinned) and 4.7 s to 45.5 s (device-visible) because the prefill that
-establishes the spilled tier dominates. Matching burst duration alone would leave
-almost all of the heat uncontrolled. So each control is matched to the elapsed
-time at which the paired isochronal run's measurement window opens and closes:
+Matched on elapsed wall clock, not on step count or burst duration. The bursts
+themselves last 2.2 to 5.5 s and differ little across targets, but the process
+durations run from 4.7 to 94.3 s (CPU-pinned) and from 4.7 to 45.5 s
+(device-visible), because the prefill that establishes the spilled tier
+dominates. Matching burst duration alone would leave almost all of the heat
+uncontrolled, so each control is matched to the elapsed times at which the
+paired isochronal run's measurement window opens and closes:
 
    mode            target   T_start_s   T_end_s   window_s
    CPU-pinned           0        2.5       4.7      2.17
@@ -33,31 +34,30 @@ time at which the paired isochronal run's measurement window opens and closes:
    device-visible    4096       18.7      22.0      3.29
    device-visible    8192       41.4      45.5      4.13
 
-These bands are DESIGN CONSTANTS taken from the published isochronal block
+These bands are design constants taken from the published isochronal block
 (stress_results/b2_isochronal_both_modes.csv, mean over its three trials). They
-choose how long each control runs; they are not used in any arithmetic. Every
-number in the analysis comes from THIS block.
+set how long each control runs and enter no arithmetic; every number in the
+analysis comes from this block.
 
-NO SPLICING. The isochronal arms are re-run here, interleaved with the controls
-in the same randomised complete block, so the correction subtracts a control
-measured in the same block from an isochronal value measured in the same block.
-Correcting the OLD block with a NEW control would have been a cross-block
-operation of exactly the kind the rules forbid.
+The isochronal arms are re-run here, interleaved with the controls in the same
+randomized complete block, so the correction subtracts a control from an
+isochronal value measured in the same block. Correcting the old block with a
+new control would combine two blocks.
 
-Both kinds of run are INSTRUMENTED (UNIKV_LOG), as the published isochronal block
-was: per-step wall clock is the measurement on both sides, so the instrumentation
-is common-mode and cancels in the subtraction.
+Both kinds of run are instrumented (UNIKV_LOG), as the published isochronal
+block was: the per-step wall clock is the measurement on both sides, so the
+instrumentation is common to both and cancels in the subtraction.
 
-CONTROL PROMPT: 1000 tokens at C=1024, so the window is full after 24 generated
-tokens (~0.7 s) and every measured band — the earliest opens at 2.5 s — sits in
-the constant-work regime. A 512-token prompt would have left the earliest band
-inside the still-growing-cache regime and broken the control.
+Control prompt: 1000 tokens at C = 1024, so the window is full after 24
+generated tokens (about 0.7 s) and every measured band, the earliest of which
+opens at 2.5 s, falls in the constant-work regime. A 512-token prompt would have
+left the earliest band inside the regime where the cache is still growing.
 
-DESIGN: randomised complete block. Each round is a random permutation of all 24
+Design: randomized complete block. Each round is a random permutation of all 24
 cells (12 configurations x {isochronal, control}), so kind and target are
 orthogonal to position by construction. Results are written after every run and
-an interim fit is printed after each round, so stopping after round 1 or 2 still
-leaves a balanced design with fewer trials.
+an interim fit is printed after each round, so stopping after round 1 or 2
+still leaves a balanced design with fewer trials.
 """
 
 import csv, datetime, math, os, random, re, statistics as st, subprocess, sys, time

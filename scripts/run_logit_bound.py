@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
-"""Review item M2 — a quantitative bound on exactness, not a token-identity claim.
+"""Logit-level bound on exactness, beyond token identity.
 
-DA-1 is right that token identity under greedy argmax cannot distinguish exact
-from near-exact: two arms can agree on all 512 sampled tokens while their logits
-differ by an amount that would flip a token on a different prompt. This measures
-the underlying quantity directly.
+Token identity under greedy decoding cannot tell exact from near-exact: two
+arms can agree on all 512 sampled tokens while their logits differ by enough to
+flip a token on another prompt. This measures the logits directly.
 
-UNIKV_LOGIT_LOG=<path> dumps the RAW model logits for every sampled step as
-float32, before the sampler touches them. Differencing the files across arms
-gives max |delta logit| over the 512-token horizon.
+UNIKV_LOGIT_LOG=<path> makes the fork dump the raw logits at every sampled step
+as float32, before the sampler sees them. Differencing the dumps across arms
+gives max |delta logit| over the 512-token horizon; analyze_logit_margins.py
+compares that against the reference's margins.
 
-Arms (C=1024 for the retention tiers, C=8192 for the no-eviction reference, the
-same geometry as the published token-identity block), both prompts, greedy,
-seed 123, -fa off. Identity is deterministic, so no cooldowns and no repeats:
-this measures arithmetic, not rate.
+Arms: C = 1024 for the two retention tiers and H2O, C = 8192 for the
+no-eviction reference (the same geometry as the token-identity block), both
+prompts, greedy, seed 123, -fa off. Identity is deterministic, so there are no
+cooldowns and no repeats: this measures arithmetic, not rate.
 
-Outcome, per the brief:
-  ~1e-6  -> exact to float32 round-off; state a quantitative bound and the
-            recommendation in Section 9 gets stronger.
-  ~1e-3  -> the arms are near-exact rather than exact, and that is a finding in
-            its own right.
+The dumps go to artifacts/logit_bound/ (artifacts/logit_bound_<tag>/ for
+another model) and are not archived; the CSV is.
 """
 
 import csv, os, re, subprocess, sys

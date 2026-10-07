@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exact retention priced against the resident-attention baseline (Table 3).
+"""Exact retention priced against the resident-attention baseline (Table 2).
 
 Reads, per model:
   stress_results/resident_baseline_<m>.csv   p0_resident and p3_dev in one

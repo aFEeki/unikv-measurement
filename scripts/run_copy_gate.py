@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Demotion-copy gate: how much of the fixed charge is the per-step copy.
-COOLED, IDLE MACHINE.
+Needs a cooled, idle machine.
 
 Every decode step on the plateau demotes one cell, and the copy runs per layer:
 K as one row, V (transposed with flash attention off) as one strided column,
 which on a Metal buffer without a 2-D copy becomes one call per V element per
 layer, each way. The copy therefore sits inside the fixed charge on both tiers,
-and nothing so far has separated it.
+and this block separates it.
 
 UNIKV_COPY_REPS (fork) runs the copy 0, 1 or 2 times per demotion. At 2 the
 repeat rewrites identical bytes, so the output stays exact; at 0 the spilled

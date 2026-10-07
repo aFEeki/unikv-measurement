@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""The three slot checks the threats section establishes, applied to any contrast.
+"""Contrast between two arms, corrected for execution order in four ways.
 
-Written for the drain-alpha block's bad draw and reused here. Given a block CSV,
-two arm names and a context, report the A-B contrast four ways:
+Written for the drain-by-alpha block, whose randomization confounded condition
+with position (Section 7 of the paper), and usable on any block. Given a block
+CSV, two arm names and a context, it reports the A - B contrast as:
 
-  RAW        difference of cell means
-  DETRENDED  remove cell means, regress residuals on execution slot to get a
+  raw        difference of cell means
+  detrended  remove cell means, regress the residuals on execution slot to get a
              drift in tok/s per slot, then correct each cell mean by
              drift * (that cell's mean slot - the grand mean slot)
-  LOCAL      strictly local contrasts, immune to ANY monotone drift: for each run
-             of arm A, linearly interpolate arm B's value at A's slot from the
-             two bracketing B runs (nearest-neighbour where A falls outside the
-             bracket), and difference there
-  DRIFT      the fitted drift itself, with its standard error, so the reader can
-             see whether there was anything to correct
+  local      local contrasts that no monotone drift can bias: for each run of
+             arm A, interpolate arm B's value at A's slot linearly from the two
+             bracketing B runs (nearest neighbor when A falls outside them), and
+             take the difference there
+  drift      the fitted drift itself, with its standard error, to show whether
+             there was anything to correct
 
   python3 scripts/check_slot_effects.py <csv> <armA> <armB> [ctx ...]
 """

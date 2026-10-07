@@ -1,30 +1,28 @@
 #!/usr/bin/env python3
-"""Fit gamma and delta from an isochronal block, per artifacts/b2_cooled/REGRESSION_SPEC.txt.
+"""Fit the affine recall-cost model to an isochronal block.
 
-That spec is the authority on the fit and this script implements it literally, so
-a second model's coefficients are produced by the same procedure as the paper's:
+The procedure is fixed, so that every model's coefficients come out of the same
+steps as the paper's Equations (1) and (2):
 
-  filter     rc == 0 and target > 0   (target == 0 rows are the no-spill
-                                       references; they set gamma, they are not
-                                       points on the affine branch)
-  unit       one RUN is one observation — NOT a fit on the six cell means
-  regressor  n_spill_mean, the MEASURED spilled-set size from the run's own log
-  response   ms_mean for the published coefficients, ms_median for the
-             estimator-sensitivity check
-  gamma      intercept minus that arm's OWN no-spill reference
+  filter     rc == 0 and target > 0 (target 0 rows are the no-spill references,
+             not points on the affine branch)
+  unit       one run is one observation, not one cell mean
+  regressor  n_spill_mean, the spilled-set size the run's own log reports
+  response   ms_mean for the coefficients, ms_median as an estimator check
+  gamma      the intercept minus that arm's own no-spill reference. This is the
+             earlier definition of the fixed term; Table 2 of the paper uses the
+             plateau instead (analyze_resident_baseline.py).
 
-Note that run_b2_cooled.py's inline printout fits against the harness's TARGET
-instead, which is why its intercepts differ from the paper's by slope x 79.5
-cells. REGRESSION_SPEC explains that; this script deliberately reproduces the
-PAPER's version.
+run_b2_cooled.py's inline printout regresses on the harness target instead, so
+its intercepts differ from these by the slope times 79.5 cells.
 
   python3 scripts/analyze_isochronal.py stress_results/b2_isochronal_both_modes.csv
   python3 scripts/analyze_isochronal.py <qwen.csv> --compare <llama.csv>
 
---compare puts two INDEPENDENTLY FITTED blocks side by side and tests the
-paper's formulas as predictions. It never pools the rows: the two models are
-separate blocks and merging them would destroy exactly the property that makes
-this a prediction test.
+--compare prints two separately fitted blocks side by side and tests the
+paper's formulas as predictions. It never pools the rows: the models are
+separate blocks, and pooling them would remove what makes this a prediction
+test.
 """
 
 import argparse
@@ -165,8 +163,7 @@ def main():
     a = ap.parse_args()
 
     # Infer the label from the filename rather than defaulting to a model
-    # name: a hardcoded default silently mislabels the other model's block,
-    # which is the one thing this script must never do.
+    # name: a hardcoded default would mislabel the other model's block.
     def infer(path, given):
         if given:
             return given

@@ -1,48 +1,45 @@
 #!/usr/bin/env python3
-"""Figure 8 for the measurement paper — how token-identity fails, not just when.
+"""Figure 2 of the paper (fig8_horizon): how token identity fails, not only when.
 
-Finding 2's central positive claim is currently two tables. Table 3 gives the
-first-divergence index and nothing else, which makes the two prompts look like
-the same result at different offsets. They are not, and the difference is the
-reason the run was not stopped at the first mismatch:
+Table 4 gives each arm's first-divergence index and nothing else, which makes
+the two prompts look like the same result at different offsets. They differ,
+which is why the runs continued past the first mismatch:
 
-  - on the passkey probe H2O diverges once at token 16 and never recovers. It
-    falls into a repetition loop and sits at coincidence-level agreement for the
-    remaining 384 tokens.
-  - on prose it diverges at token 0, re-synchronises briefly, then decoheres
-    gradually: 64.1% -> 37.5% -> 21.9% -> 7.8% across four 128-token windows.
-    Both arms are generating the same KIND of text, so they keep colliding on
-    boilerplate while the contents drift apart.
+  - On the passkey probe H2O diverges once, at token 16, and does not recover:
+    it falls into a repetition loop and stays at coincidence-level agreement
+    for the remaining 384 tokens.
+  - On prose it diverges at token 0, re-synchronizes briefly, then decoheres
+    gradually: 64.1%, 37.5%, 21.9% and 7.8% agreement across four 128-token
+    windows. Both arms generate the same kind of text, so they keep colliding
+    on boilerplate while the content drifts apart.
 
-Meanwhile both exact-retention arms sit on 1.0 for all 512 tokens on both
-prompts, which is the claim the paper's one recommendation rests on.
+Both exact-retention arms match the reference on all 512 tokens of both prompts.
 
-WHAT IS PLOTTED: CUMULATIVE agreement with the no-eviction reference -- the
-fraction of tokens 0..i that matched -- against generated token index. Its
-endpoints are exactly the totals quoted in the text (30/512 = 5.9% on passkey,
-168/512 = 32.8% on prose), so the curve carries no smoothing parameter and
-cannot be tuned.
+What is plotted: cumulative agreement with the no-eviction reference (the
+fraction of tokens 0..i that match) against generated token index. The
+endpoints are the totals quoted in the text (30/512 = 5.9% on passkey,
+168/512 = 32.8% on prose), so the curve has no smoothing parameter to tune.
 
-A trailing-window version was built first and rejected. At a 32-token window the
-prose arm spikes back above 70% around token 350, because H2O periodically
-re-synchronises on markdown boilerplate. That is real, but it reads as though the
-arm recovers, and it contradicts the monotone 128-token decay the text reports.
-Cumulative agreement shows the sustained divergence without inviting that
-reading; the local re-synchronisation is described in the text instead, where it
-can be explained rather than merely seen.
+A trailing-window version was tried first and dropped. At a 32-token window the
+prose arm climbs back above 70% around token 350, because H2O periodically
+re-synchronizes on markdown boilerplate. That is real, but it reads as recovery
+and contradicts the steady 128-token decay the text reports. Cumulative
+agreement shows the sustained divergence without inviting that reading; the
+text describes the local re-synchronization instead.
 
-WHY BOTH RETENTION ARMS ARE ONE LINE: they are token-identical to each other and
-to the reference, so three curves would overplot exactly. Drawing one and saying
-so is honest; drawing three suggests three measurements agreeing to within
-something, and there is no "within" here.
+The two retention arms are drawn as one line because they are token-identical
+to each other and to the reference. Three exactly overlapping curves would
+suggest three measurements agreeing within some tolerance, and there is none.
 
-PROVENANCE: sequences are the full sampled-ID traces written by
-scripts/run_token_horizon.py, one file per (prompt, arm). Every claim in the
-figure is re-derived from those files at build time and checked against the
-locked values below, which are the ones printed in the paper.
+Data: the sampled-ID traces written by run_token_horizon.py, one file per
+(prompt, arm). SEQ_DIR points at artifacts/token_horizon/sequences/ in the
+working tree; the archive holds the same files under
+quality_results/token_sequences/llama31_8b/. Every value in the figure is
+re-derived from those files and checked against the locked values below, which
+are the ones printed in the paper.
 
-Writes figures/fig8_horizon.{pdf,png} and copies the PDF to
-paper/UNIKV-MEASUREMENT/.
+Writes figures/fig8_horizon.{pdf,png}, and copies the PDF into
+paper/UNIKV-MEASUREMENT/ if that directory exists.
 """
 
 import shutil
@@ -59,7 +56,7 @@ PAPER_DIR = ROOT / "paper" / "UNIKV-MEASUREMENT"
 WINDOW  = 32
 HORIZON = 512
 
-# ---- LOCKED (from artifacts/token_horizon/token_horizon_analysis.txt) ------
+# ---- locked values, as printed in the paper --------------------------------
 # prompt -> arm -> (first divergence index or None, tokens matching reference)
 LOCKED = {
     "passkey": {"p3_cpu_c1024":  (None, 512),
@@ -116,7 +113,7 @@ def verify():
             out[prompt][arm] = a
 
         # the two retention arms must be identical to each other, not merely
-        # both identical to the reference -- that is what lets us draw one line
+        # both identical to the reference; that is what lets us draw one line
         if load(prompt, "p3_cpu_c1024") != load(prompt, "p3_dev_c1024"):
             die(f"{prompt}: the two retention tiers are not token-identical")
 

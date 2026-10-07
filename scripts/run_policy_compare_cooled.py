@@ -1,36 +1,35 @@
 #!/usr/bin/env python3
-"""Paired policy comparison p0 / p1 / p3 at C in {1024, 2048}, cooled
-randomized-block protocol (review items M1/M6, DA-3).
+"""Cooled policy comparison, p0 / p1 / p3 at C in {1024, 2048}.
 
-Two things this fixes relative to `run_policy3_reruns.py` (Run 1):
+Two changes from run_policy3_reruns.py's Run 1:
 
-  1. Policy 1 (rolling-window shift) is included. Run 1 compared UniKV only
-     against the error-out baseline (policy 0), which is the comparator the
-     review calls cherry-picked: policy 1 also completes the full budget, so
-     the token-count advantage over it is 1x and the real difference is what
-     gets generated, not how much.
-  2. The block is cooled and randomized (the protocol used for the cooled
-     alpha sweep) instead of one sequential uncooled pass, on a device
-     documented to swing ~21% from heat.
+  1. The rolling window (policy 1) is included. Run 1 compared exact retention
+     only against the unmodified runtime, which stops with an error when the
+     cache fills. Policy 1 also completes the budget, so the token count does
+     not separate the two; what separates them is what gets generated.
+  2. The block is cooled and randomized (the protocol of the cooled alpha
+     sweep) instead of one sequential uncooled pass, on a device that swings
+     about 21% from heat.
 
-Protocol, identical across every arm: 512-token prompt + 2048-token decode
-budget, -fa off, -fit off, greedy (temp 0), seed 123, --ignore-eos,
--b 512 -ub 512, UNIKV_ALPHA=0. The flash_attn line is parsed out of each run's
-own log and recorded per row as evidence rather than trusted from this source.
+Protocol, the same for every arm: 512-token prompt, 2048-token decode budget,
+-fa off, -fit off, greedy (temperature 0), seed 123, --ignore-eos,
+-b 512 -ub 512, UNIKV_ALPHA=0. The flash_attn line is parsed from each run's own
+log and recorded per row.
 
-Throughput runs are UNINSTRUMENTED (no UNIKV_LOG) so the per-decode-call
-synchronize() pair does not inflate the wall clock; that makes these numbers
-directly comparable to the cooled alpha sweep's alpha=0 anchor. Run with
-UNIKV_PC_STEPLOG=1 for a separate instrumented pass that records per-arm
-shift/spill counts (counts are deterministic under greedy + fixed seed, so one
-pass is enough).
+Throughput runs are uninstrumented (no UNIKV_LOG), so the per-call synchronize()
+pair does not inflate the wall clock and the numbers are comparable with the
+cooled alpha sweep's alpha = 0 anchor. UNIKV_PC_STEPLOG=1 runs a separate
+instrumented pass that records per-arm shift and spill counts (deterministic
+under greedy decoding and a fixed seed, so one pass is enough).
 
-env knobs:
+Environment:
   UNIKV_PC_TRIALS    trials per arm            (default 3)
   UNIKV_PC_COOLDOWN  seconds before every run  (default 150)
   UNIKV_PC_ARMS      comma-separated arm tags  (default all six)
   UNIKV_PC_TAG       output filename suffix
-  UNIKV_PC_STEPLOG   1 = set UNIKV_LOG and count shift/spill events
+  UNIKV_PC_STEPLOG   1 = set UNIKV_LOG and count shift and spill events
+
+Block 2 of run_b2_cooled.py replaced this comparison with five arms.
 """
 
 import csv

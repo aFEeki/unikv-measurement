@@ -1,34 +1,37 @@
 #!/usr/bin/env python3
-"""All passkey arms in ONE harness at ONE batch configuration (review M5).
+"""All passkey arms in one harness at one batch configuration (Table 3 of the paper).
 
-The published Table 2 was assembled across two harnesses: run_spill_gate.py
-(-b 256 -ub 256, flash attention off) supplied the UniKV, no-eviction-reference
-and naive-window rows, while run_quality_probe_A.py ran flash attention ON and
-recorded shift_events under a different definition (a per-call flag, not a
-count), and the flash-attention-off StreamingLLM re-run used a third batch
-tiling (512). So whichever provenance the naive row had, the sentence "all four
-arms run with flash attention disabled, so the sink is the sole difference
-between the eviction runs" could not be true as written.
+An earlier version of the passkey table was assembled from two harnesses:
+run_spill_gate.py (-b 256 -ub 256, flash attention off) supplied the retention,
+no-eviction-reference and naive-window rows, while run_quality_probe_A.py ran
+with flash attention on and recorded shift events under a different definition
+(a per-call flag, not a count), and the flash-attention-off StreamingLLM re-run
+used a third batch tiling (512). The claim that all four arms ran with flash
+attention off, so the sink was the only difference between the eviction runs,
+could not hold as written.
 
-This harness runs every arm in one process sequence, one batch configuration,
-flash attention off everywhere, and records a per-arm demotion count under a
-single definition: the number of decode calls whose shift_events flag fired
-(= total spill events for policy 3, total shift events for policy 1). The two
-eviction arms must therefore be comparable on that column, which is what makes
-"the sink is the sole difference" checkable rather than asserted.
+This harness runs every arm in one sequence, at one batch configuration, with
+flash attention off throughout, and records a demotion count under one
+definition: the number of decode calls whose demotion flag fired (total spill
+events for policy 3, total shift events for policy 1). The two window arms are
+therefore comparable on that column, which makes "the sink is the only
+difference" checkable.
 
-Arms (identical prompt, seed, greedy decode, -fa off, -b/-ub 256):
+Arms (same prompt, seed and greedy decoding, -fa off, -b/-ub 256):
 
-  ref_p0_c4096          policy 0, C=4096   no-eviction reference (stock)
-  idle_p3_c4096         policy 3, C=4096   UniKV with nothing spilled
-  unikv_p3_c1024        policy 3, C=1024   UniKV lossless spill-and-recall
-  streamingllm_p1_c1024 policy 1, C=1024, UNIKV_SINK=4   sink-preserving control
-  naive_p1_c1024        policy 1, C=1024, UNIKV_SINK=0   naive rolling window
-  h2o_p4_c1024          policy 4, C=1024   H2O fixed-budget eviction (prior art)
+  ref_p0_c4096          policy 0, C = 4096   no-eviction reference
+  idle_p3_c4096         policy 3, C = 4096   exact retention, nothing spilled
+  unikv_p3_c1024        policy 3, C = 1024   exact retention, spilling
+  streamingllm_p1_c1024 policy 1, C = 1024, UNIKV_SINK=4   sink-preserving window
+  naive_p1_c1024        policy 1, C = 1024, UNIKV_SINK=0   naive rolling window
+  h2o_p4_c1024          policy 4, C = 1024   H2O heavy-hitter eviction
 
-Gates: ref / idle / unikv emit identical sampled token IDs and all retrieve the
-passkey; both eviction arms lose it. Exactness is compared on sampled token IDs
-(UNIKV_TOKEN_LOG), not on re-encoded output text.
+Checks: the reference, idle and spilling retention arms emit identical sampled
+token IDs and all retrieve the passkey; both window arms lose it. H2O is not
+checked either way, because whether it keeps the passkey is the result.
+Exactness is compared on sampled token IDs (UNIKV_TOKEN_LOG), not on re-encoded
+text. The H2O arm also writes its survivor trace (UNIKV_H2O_TRACE) to the run
+logs.
 """
 
 import csv
@@ -67,7 +70,7 @@ GEN_TOKENS = 32
 THREADS    = 10
 GPU_LAYERS = 999
 SEED       = 123
-BATCH      = 256          # ONE batch configuration for every arm
+BATCH      = 256          # one batch configuration for every arm
 UBATCH     = 256
 SPILL_CAP  = 8192
 COOLDOWN_S = int(os.environ.get("UNIKV_QA_COOLDOWN", "0"))
@@ -87,13 +90,12 @@ EXACT_ARMS = ["ref_p0_c4096", "idle_p3_c4096", "unikv_p3_c1024"]
 # Window-eviction arms, gated to lose the passkey: a size-C window whose span
 # excludes position ~219 cannot contain it. This is a structural guarantee.
 LOSS_ARMS  = ["streamingllm_p1_c1024", "naive_p1_c1024"]
-# The two arms that differ ONLY in the sink, for the controlled comparison.
+# The two arms that differ only in the sink, for the controlled comparison.
 EVICT_ARMS = LOSS_ARMS
-# H2O is deliberately NOT gated either way. It selects by accumulated attention
-# rather than by recency, so it CAN retain a token at position 219, and whether
-# it does is the result this arm exists to measure -- not a precondition of the
-# run. Gating it to lose would be exactly the strawman this comparator is meant
-# to avoid.
+# H2O is not gated either way. It selects by accumulated attention rather than
+# by recency, so it can keep a token at position 219, and whether it does is the
+# result this arm measures, not a precondition of the run. Gating it to lose
+# would set the comparator up to fail.
 COMPARATOR_ARMS = ["h2o_p4_c1024"]
 
 
@@ -157,7 +159,7 @@ def run_arm(prompt: Path, tag: str, ctx: int, policy: int, sink: int, role: str)
     if tok_log.exists():
         token_ids = [int(l) for l in tok_log.read_text().split() if l.strip()]
 
-    # ONE definition for every arm: decode calls whose demotion flag fired.
+    # One definition for every arm: decode calls whose demotion flag fired.
     demotion_calls, first_demotion = 0, None
     if step_csv.exists():
         with step_csv.open(newline="") as fh:
@@ -180,8 +182,8 @@ def run_arm(prompt: Path, tag: str, ctx: int, policy: int, sink: int, role: str)
     mt  = re.search(r"UNIKV_E2E .*tok_per_sec=([\d.]+)", done.stdout)
 
     # Two definitions kept side by side: `distinct_word_ratio` is
-    # case-SENSITIVE, matching run_quality_probe_A.py so the numbers are
-    # directly comparable to the published Table 2; the case-folded variant is
+    # case-sensitive, matching run_quality_probe_A.py so the numbers are
+    # comparable with the earlier passkey table; the case-folded variant is
     # the slightly stricter loop indicator (it merges "The"/"the").
     words = text.split()
     dwr = round(len(set(words)) / len(words), 3) if words else 0.0

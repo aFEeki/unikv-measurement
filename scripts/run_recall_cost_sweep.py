@@ -1,35 +1,33 @@
 #!/usr/bin/env python3
-"""Recall-cost characterization: decode cost vs spilled-set size (review M7, P5).
+"""Recall cost against spilled-set size from long runs, with a thermal control.
 
-The paper currently supports "the recurring recall cost grows with the spilled
-set" with two points (33.0 tok/s @ 511 cells, 28.5 @ 1535). Two points fix a
-line through anything, and the shape is what decides whether the policy
-survives the 10^4-10^5-token workloads the discussion invokes.
+An earlier draft supported "the recall cost grows with the spilled set" with two
+points (33.0 tok/s at 511 cells, 28.5 at 1535). Two points fit a line through
+anything, and the shape matters. Three measurements:
 
-Three measurements:
+  A  per-step curve. One long policy-3 run at fixed C, with a large decode
+     budget and UNIKV_LOG on. The per-call CSV carries n_spilled, and call_ms is
+     bracketed by synchronize() at both ends, so each decode step is one
+     (n_spill, ms) sample, from n_spill = 0 to (prompt + budget - C).
 
-  A  per-step curve.  One long policy-3 run at fixed C, prompt + a large decode
-     budget, with UNIKV_LOG on. The per-call CSV now carries n_spilled, and
-     call_ms is bracketed by synchronize() on both sides, so each decode step is
-     one (n_spill, ms) sample. A single run yields thousands of points spanning
-     n_spill = 0 to (prompt + budget - C).
+  B  thermal control. The same C, prompt and budget under policy 1, whose window
+     is pinned at C with nothing spilled: the work per step is constant, so any
+     drift in ms/step across the run is thermal. In run A n_spill grows with
+     time, so the drift aliases onto the slope; this control measures it so it
+     can be subtracted. It also serves as the resident-only reference at the
+     same size.
 
-  B  thermal control.  The same C, prompt and budget under policy 1, whose
-     window is pinned at C with nothing spilled: work per step is constant, so
-     any drift in ms/step across that run is time-correlated thermal droop. In
-     run A n_spill grows monotonically with time, so droop would alias straight
-     onto the slope -- this control measures the alias and lets it be
-     subtracted. It doubles as the same-resident-size, GPU-only reference that
-     isolates the fixed cost of entering the two-tier path.
+  C  e2e cross-check. Uninstrumented policy-3 runs at several decode budgets, in
+     randomized-block order with cooldowns, giving wall-clock tok/s against the
+     final n_spill, to check that the per-step shape is not an artifact of the
+     per-step synchronize() pair.
 
-  C  e2e cross-check.  Uninstrumented policy-3 runs at several decode budgets,
-     randomized-block with cooldowns, giving wall-clock tok/s against final
-     n_spill. Confirms the per-step shape is not an artifact of the per-step
-     synchronize() pair.
+Protocol everywhere: -fa off, -fit off, greedy (temperature 0), seed 123,
+--ignore-eos, -b/-ub 512, alpha 0. flash_attn is read back out of each run's own
+log and recorded.
 
-Protocol everywhere: -fa off, -fit off, greedy (temp 0), seed 123,
---ignore-eos, -b/-ub 512, alpha 0. flash_attn is read back out of each run's
-own log and recorded, not assumed.
+Section 3 of the paper uses A and B only to show that a single long run
+confounds the slope with heating; analyze_recall_cost.py fits them.
 """
 
 import csv

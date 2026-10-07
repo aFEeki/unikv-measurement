@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
-"""
-Path B Item 2, Option A — HONEST quality contrast via a completion.cpp patch that
-lets UNIKV_POLICY!=0 ingest a prompt longer than the KV cache (evicting during
-prefill through the in-library UniKV policy, NOT the stock front-preserving shift).
+"""Second passkey probe, with prompts longer than the cache (policy 2 against policy 1).
 
-GATE-1 (run FIRST; contrast is untrusted unless this passes):
-  A prompt that FITS the cache is decoded two ways that differ ONLY in how the
-  prefill is split into llama_decode() calls:
-    - batched   : -b 256   (several decode calls)
-    - single    : -b 1024  (one decode call)
-  Both pin -ub 256 (identical ubatch tiling => identical matmul reduction order =>
-  no batch-size floating-point drift). Greedy (--temp 0). Therefore any output
-  difference is position/n_past corruption from multi-call chunking — which is the
-  exact machinery the long-prompt contrast relies on. Outputs must be IDENTICAL.
-  If not identical -> STOP, do not run the contrast, fall back to Option D.
+A completion.cpp change lets UNIKV_POLICY != 0 ingest a prompt longer than the
+KV cache, evicting during prefill through the fork's policy rather than the
+stock front-preserving shift. Policy 2 is an early retention variant the paper
+does not evaluate; run_quality_arms_unified.py replaced this probe.
 
-CONTRAST (only if Gate-1 identical):
-  Same long prompt (passkey early + long filler + trailing question), L >> C.
-    - policy-2 arm: UNIKV_POLICY=2, -c 4096 (>= L)  -> retains -> passkey RETRIEVED
-    - policy-1 arm: UNIKV_POLICY=1, -c 1024 (< L)   -> evicts  -> passkey LOST,
-                    and shift_events > 0 (proof the in-library eviction fired).
+Gate 1 runs first, and the contrast is not trusted unless it passes. A prompt
+that fits the cache is decoded two ways that differ only in how prefill is split
+into llama_decode() calls:
+  - batched: -b 256 (several decode calls)
+  - single:  -b 1024 (one decode call)
+Both pin -ub 256, so the ubatch tiling and the matmul reduction order are the
+same, and decoding is greedy. Any difference in output would come from position
+or n_past errors in multi-call chunking, which is the machinery the long-prompt
+contrast relies on. The outputs must be identical; if they are not, the
+contrast is not run.
 
-Greedy/deterministic; reports NO tok/s. Strips the UNIKV_E2E stdout marker before
-any comparison/matching. Results -> quality_results/ (mirrors alpha_results/).
+Contrast (only if Gate 1 passes): the same long prompt (passkey early, long
+filler, closing question), with L much larger than C.
+  - policy-2 arm: UNIKV_POLICY=2, -c 4096 (>= L): retains, passkey retrieved
+  - policy-1 arm: UNIKV_POLICY=1, -c 1024 (< L): evicts, passkey lost, with
+    shift events > 0 as evidence that the eviction ran
+
+Deterministic; reports no tok/s. The UNIKV_E2E stdout marker is stripped before
+any comparison. Results go to quality_results/.
 """
 
 from __future__ import annotations
@@ -178,9 +180,9 @@ def contrast() -> None:
     assert all(checks.values()), "contrast preconditions not met"
 
     rows = []
-    # Four arms: UniKV retention; StreamingLLM (sink-preserving, k=4); naive rolling
-    # (sink=0); and an honesty CONTROL (policy-1 big cache, no eviction) that must
-    # also retrieve. distinct_word_ratio is an objective loop signal (a degenerate
+    # Four arms: retention (policy 2); StreamingLLM (sink-preserving, k=4); the
+    # naive rolling window (sink=0); and a control (policy 1 with a cache large
+    # enough that nothing is evicted) that must also retrieve. distinct_word_ratio is an objective loop signal (a degenerate
     # loop -> few distinct words -> low ratio; coherent text -> high ratio).
     arms = [
         ("UniKV_retention", 2, BIG_C,   0, "contrast_policy2_c4096"),

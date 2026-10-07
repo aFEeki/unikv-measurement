@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
-"""Cooled prefill blocks over (ubatch, context) cells. Serves review Blocks 2 and 3.
+"""Cooled prefill blocks over (ubatch, context) cells: two checks on the capacity finding.
 
-BLOCK 2 — the cooled ubatch block Section 11 concedes was never run.
-  "we have not run a cooled ubatch block, so a small penalty would be invisible
-  to us." The published figures are single UNCOOLED runs at C=49152:
-  259.6 / 259.4 / 268.2 / 237.0 tok/s for ubatch 64/128/256/512, which the paper
-  reports as a non-effect at its resolution rather than as an absence. Three
-  cooled trials per cell turns that into a powered null or a resolved penalty.
+Block A: the cooled ubatch block. The first ubatch figures were single uncooled
+runs at C = 49152: 259.6, 259.4, 268.2 and 237.0 tok/s for ubatch 64, 128, 256
+and 512, read at the time as no effect at that resolution rather than as the
+absence of one. Three cooled trials per cell turn that into either a powered
+null or a resolved penalty.
 
-    UNIKV_UB_CELLS="64:49152,128:49152,256:49152,512:49152" UNIKV_UB_OUT=... 
+    UNIKV_UB_CELLS="64:49152,128:49152,256:49152,512:49152" UNIKV_UB_OUT=...
 
-BLOCK 3 — the n=1 degradation Section 7 flags as "observed once and not repeated".
-  One run at ubatch 128, C=81920 took 251.8 s against 62-71 s for every other
-  completing configuration in the sweep. Repeat it three times, with the two
-  nearest COMPLETING configurations three times each as controls so a slowdown
-  has something to be slow against.
+Block B: the slow run near the wall, which had been seen once and not repeated.
+One run at ubatch 128, C = 81920 took 251.8 s against 62 to 71 s for every other
+completing configuration in the sweep. It is repeated three times, with the two
+nearest completing configurations three times each as controls, so a slowdown
+has something to be slow against.
 
     UNIKV_UB_CELLS="128:81920,64:81920,128:65536" UNIKV_UB_OUT=...
 
-Randomised COMPLETE block: each round is a fresh permutation of every cell, so
+Randomized complete block: each round is a fresh permutation of every cell, so
 cell is orthogonal to execution position by construction. 200 s cooldowns,
-uninstrumented, -fa off parsed back per run, greedy, seed 123. Prefill duration
-is a rate, so it gets the cooled protocol.
+uninstrumented, -fa off parsed per run, greedy, seed 123. Prefill duration is a
+rate, so it gets the cooled protocol.
 
-Reports the residual-on-slot fit and the mean slot per cell, per the standing
-rule that position balance be visible rather than assumed.
+Reports the residual-on-slot fit and the mean slot per cell, so position
+balance is visible rather than assumed. Section 6 of the paper reports both
+blocks.
 """
 
 import csv, datetime, math, os, random, re, statistics as st, subprocess, sys, time
@@ -178,7 +178,7 @@ def main():
             print(f"{ub:>7} {ctx:>7} {'0':>2} {'n/a':>14} {'':>7} {'':>7} "
                   f"{st.mean(durs) if durs else 0:>11.1f} {','.join(sorted(outs)):>22}")
 
-    # position diagnostics, per the standing rule
+    # position diagnostics, so the balance is visible rather than assumed
     print("\nposition diagnostics (residual-on-slot, and mean slot per cell):")
     xs, ys = [], []
     for (ub, ctx), v in by.items():

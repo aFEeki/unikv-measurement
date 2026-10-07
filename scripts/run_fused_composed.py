@@ -1,45 +1,42 @@
 #!/usr/bin/env python3
-"""Item 2 — the composed fused-kernel cost, in ONE block.
+"""The cost of exact retention against a fused baseline, in one block.
 
-Section 8 gives the exactness premium (11.4% over H2O at C=1024) and Section 3
-gives the fused-kernel penalty (12.4% at C=4096) from DIFFERENT blocks, and the
-paper declines to compose them because that is exactly the splice Section 6
-refuses on its own data. Putting all four arms in one cooled block removes the
-need to decline.
+The premium over H2O and the fused kernel's advantage were first measured in
+different blocks, and combining them would be a cross-block splice. This block
+puts all four arms in one cooled block.
 
-ARMS (C in {1024, 2048}, 3 rounds):
-  p0_fa_on    upstream WITH flash attention  <- the fused baseline
+Arms (C in {1024, 2048}, 3 rounds):
+  p0_fa_on    upstream with flash attention (the fused baseline)
   p0_fa_off   upstream, -fa off
-  p4_h2o      H2O, -fa off (needs the explicit softmax to score cells)
-  p3_dev      exact retention, device-visible tier, -fa off (policy 3 refuses to
-              construct with -fa on; the preflight below records that refusal as
-              evidence rather than asserting it from the source)
+  p4_h2o      H2O, -fa off (it needs the explicit softmax to score cells)
+  p3_dev      exact retention, device-visible tier, -fa off (policy 3 does not
+              construct with -fa on; the preflight below records that refusal
+              rather than asserting it from the source)
 
-TWO NUMBERS COME OUT, AND ONLY ONE OF THEM IS CLEAN:
+Two numbers come out, and only one is clean:
 
-  (a) THE KERNEL PENALTY, p0_fa_on vs p0_fa_off. Same policy, same halting
-      behaviour, same decoded length — only the kernel differs. This is a clean
-      within-block contrast and is what the brief asks be reported at these
-      budgets, since the published 12.4% is from C=4096 and may not carry.
+  (a) The kernel penalty, p0_fa_on against p0_fa_off. Same policy, same halting
+      behavior, same decoded length; only the kernel differs. This is a clean
+      within-block contrast, measured at these cache sizes because the earlier
+      12.4% came from C = 4096 and need not carry over.
 
-  (b) THE COMPOSED PREMIUM, p3_dev vs p0_fa_on. This is the number a reader
-      wants, and it carries a caveat that must travel with it: POLICY 0 HALTS AT
-      CACHE-FULL. With a 512-token prompt at C=1024 it decodes ~512 tokens and
-      stops, while p3_dev and p4_h2o decode the full 2048. So p0's throughput is
-      measured only over the regime where the cache is not yet full and the KV is
-      small — the cheapest part of the run — whereas the retention arms are
-      measured over a regime that includes a spilled tier. The comparison
-      therefore FLATTERS p0 and the composed premium is an UPPER BOUND on what
-      exact retention costs against a fused baseline. The decoded-token counts are
-      recorded per run so this is visible in the CSV rather than buried.
+  (b) The direct premium, p3_dev against p0_fa_on. Policy 0 halts when the
+      cache fills: with a 512-token prompt at C = 1024 it decodes about 512
+      tokens and stops, while p3_dev and p4_h2o decode all 2048. Policy 0's
+      throughput therefore covers only the part of the run where the cache is
+      not yet full, the cheapest part, so this comparison favors p0 and the
+      direct premium is an upper bound. The decoded-token counts are recorded
+      per run, so this is visible in the CSV.
 
-      The composition via (a) — premium over H2O, both -fa off, times the kernel
-      penalty on the same policy — is the defensible route and is reported too.
+      The composed route, the premium over H2O (both -fa off) times the kernel
+      penalty on the same policy, avoids that and is the one Appendix B of the
+      paper reports (21.1% at C = 1024, 13.7% at C = 2048).
 
-DESIGN: randomised COMPLETE block, three rounds, each a random permutation of all
-eight (arm, ctx) cells, so arm is orthogonal to block position by construction.
-200 s cooldowns, uninstrumented, seed 123, greedy, EOS disabled. flash_attn is
-parsed back from every run's own log and asserted against what the arm asked for.
+Design: randomized complete block, three rounds, each a random permutation of
+all eight (arm, ctx) cells, so arm is orthogonal to block position by
+construction. 200 s cooldowns, uninstrumented, seed 123, greedy, EOS disabled.
+flash_attn is parsed back from every run's own log and checked against what the
+arm asked for.
 """
 
 import csv, datetime, math, os, random, re, statistics as st, subprocess, sys, time

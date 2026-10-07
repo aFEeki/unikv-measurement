@@ -62,10 +62,13 @@ cd llama.cpp && cmake -B build -DGGML_METAL=ON && cmake --build build -j
 ```
 
 Policies are selected at runtime through `UNIKV_POLICY`: 0 upstream (errors when
-the cache fills), 1 rolling window, 3 exact spill-and-recall, 4 H2O. Related
-variables (`UNIKV_SPILL_DEV`, `UNIKV_SPILL_CAP`, `UNIKV_ALPHA`, `UNIKV_DRAIN`,
-`UNIKV_WINDOW_DISCARD`, `UNIKV_NO_REENCODE`, `UNIKV_LOGIT_LOG`, `UNIKV_LOG`) are
-documented in the harnesses that use them.
+the cache fills), 1 rolling window, 3 exact spill-and-recall, 4 H2O. Policy 2 is
+an early retention variant the paper does not evaluate; only the two oldest
+passkey probes use it. Related variables (`UNIKV_SPILL_DEV`, `UNIKV_SPILL_CAP`,
+`UNIKV_ALPHA`, `UNIKV_DRAIN`, `UNIKV_SINK`, `UNIKV_H2O_RECENT`,
+`UNIKV_WINDOW_DISCARD`, `UNIKV_NO_REENCODE`, `UNIKV_COPY_REPS`,
+`UNIKV_LOGIT_LOG`, `UNIKV_TOKEN_LOG`, `UNIKV_LOG`) are documented in the
+harnesses that use them.
 
 ## Reproducing
 
@@ -97,5 +100,7 @@ carries a version-specific DOI if you need to pin an exact snapshot.
 
 ## License
 
-Harnesses: MIT (`LICENSE`). Result files: CC-BY-4.0 (`LICENSE-DATA`). The
-`llama.cpp` fork inherits upstream's MIT license and retains its attribution.
+Harnesses: MIT (`LICENSE`). Result files and figures: CC-BY-4.0
+(`LICENSE-DATA`); text the models generated stays under each model's own
+license. The `llama.cpp` fork inherits upstream's MIT license and retains its
+attribution.

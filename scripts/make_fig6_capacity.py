@@ -1,32 +1,30 @@
 #!/usr/bin/env python3
-"""Figure 6 for the measurement paper — where the capacity wall actually is.
+"""Figure 3 of the paper (fig6_capacity): device working set against context size.
 
-Optional figure for Finding 4. The finding has three parts that a table states
-but does not show:
+The capacity finding has three parts that a table states but does not show:
 
-  1. Device cost per context token is not the KV alone. With flash attention off
-     the attention scratch adds a term that scales with ubatch, so the same C
-     costs a different amount of device memory at different micro-batches.
-  2. The wall IS the Metal advisory budget: every configuration completes below
-     it and is refused above it, so where a line crosses is where that ubatch
-     runs out of context.
-  3. Crossing is refused at EXECUTION, not allocation -- the arithmetic predicts
-     WHERE, but nothing in the arithmetic says the failure arrives as a refused
-     command buffer rather than a failed malloc.
+  1. Device cost per context token is not the KV alone. With flash attention
+     off, the attention scratch adds a term that scales with the micro-batch,
+     so the same C costs a different amount of device memory at each ubatch.
+  2. The limit is the Metal advisory budget: every configuration completes
+     below it and is refused above it, so where a line crosses the budget is
+     where that ubatch runs out of context.
+  3. The refusal comes at execution, not allocation. The arithmetic predicts
+     where, but not that the failure arrives as a refused command buffer
+     rather than a failed allocation.
 
-Plotting measured device footprint against C, one line per ubatch, with the
+Plotting the measured device footprint against C, one line per ubatch, with the
 budget drawn and each run marked by its outcome, puts (1) and (2) in one panel:
-the fan of lines is the ubatch dependence, and every line's last filled marker
-sits below the budget line while its first hollow marker sits above it.
+the spread of the lines is the ubatch dependence, and on every line the last
+filled marker sits below the budget and the first crossed marker above it.
 
-NB the budget is printed by ggml in decimal MB and every footprint we record is
-in MiB. Comparing the two directly understates every ratio by 4.9%; see the
-conversion at BUDGET below.
+ggml prints the budget in decimal MB and every footprint is in MiB; comparing
+the two directly understates every ratio by 4.9%, so the script converts (see
+BUDGET below).
 
-Source: stress_results/f4_a1_ubatch_sweep.csv (Phase A, item A1).
-Writes figures/fig6_capacity.{pdf,png} and copies the PDF into
-paper/UNIKV-MEASUREMENT/ so it is available if the draft wants it. It is NOT
-referenced by main.tex; adding the float is a prose decision.
+Source: stress_results/f4_a1_ubatch_sweep.csv (run_f4_phaseA.py, sweep A1).
+Writes figures/fig6_capacity.{pdf,png}, and copies the PDF into
+paper/UNIKV-MEASUREMENT/ if that directory exists.
 """
 
 import csv
@@ -43,7 +41,7 @@ SRC_CSV   = ROOT / "stress_results" / "f4_a1_ubatch_sweep.csv"
 FIG_DIR   = ROOT / "figures"
 PAPER_DIR = ROOT / "paper" / "UNIKV-MEASUREMENT"
 
-# ggml prints "recommendedMaxWorkingSetSize = 17179.89 MB" in DECIMAL megabytes.
+# ggml prints "recommendedMaxWorkingSetSize = 17179.89 MB" in decimal megabytes.
 # Every device figure we record is in MiB, so the budget must be converted:
 # 17179.89e6 / 2^20 = 16384.0 MiB. Comparing MiB against the raw 17179.89
 # understates every ratio by 4.9% and moves the wall line off its true place.
@@ -115,9 +113,8 @@ def render(data, hi_ok, lo_bad):
     })
     fig, ax = plt.subplots(figsize=(3.15, 2.4))
 
-    # The measured wall is a band, not a line: the largest working footprint and
-    # the smallest refused one bracket it, and it sits just below the advisory
-    # budget rather than exactly on it.
+    # Shade everything above the advisory budget: every run up there was
+    # refused, and every completed run sits below it.
     ax.axhspan(BUDGET, 21000, color=GRAY, alpha=0.13, linewidth=0, zorder=0)
     ax.axhline(BUDGET, color=DARK, linestyle="--", linewidth=1.1, zorder=2)
     ax.text(41200, BUDGET - 500, "Metal working-set budget", fontsize=6.3,

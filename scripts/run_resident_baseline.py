@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resident-attention baseline for the per-cell term. COOLED, IDLE MACHINE.
+"""Resident-attention baseline for the per-cell term. Needs a cooled, idle machine.
 
 The question: is delta, the per-cell cost of exact retention, a cost of
 retention at all, or just what the unmodified runtime pays to attend over one
@@ -11,16 +11,16 @@ under the isochronal design itself.
 Arms, per model:
   p0_resident  upstream (policy 0), flash attention off, C = 16384 so the whole
                context stays resident. Prompts of 512, 1536, 2048, 3072, 5120
-               and 9216 tokens: the SAME prompt files the two-tier blocks used,
+               and 9216 tokens: the same prompt files the two-tier blocks used,
                so the total context at each point matches a two-tier target of
                0, 512, 1024, 2048, 4096 and 8192.
   p3_dev       exact retention, device-visible tier, C = 1024, targets 512..8192.
-               Only with UNIKV_RB_PAIRED=1. It puts the two-tier arm in the SAME
+               Only with UNIKV_RB_PAIRED=1. It puts the two-tier arm in the same
                block as its baseline, so the excess is a within-block contrast
                rather than a comparison across blocks run weeks apart.
 
 Same instrumentation as the two-tier blocks: per-step wall clock from the step
-log, 128-step burst, first 32 dropped. Randomised complete block, 3 rounds, 200 s
+log, 128-step burst, first 32 dropped. Randomized complete block, 3 rounds, 200 s
 cooldowns, flash attention verified per run from its own log.
 
   UNIKV_MODEL=<gguf> UNIKV_RB_TAG=llama UNIKV_RB_PAIRED=1 \\

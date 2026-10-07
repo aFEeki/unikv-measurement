@@ -1,54 +1,50 @@
 #!/usr/bin/env python3
-"""B2 — protocol numbers for the two spilled-tier modes. OVERNIGHT, IDLE MACHINE.
+"""Cooled blocks for the two spilled-tier configurations: the isochronal fits and the policy comparison.
 
-Nothing from B1 goes in the paper: it was smoke. This produces the
-protocol-grade numbers. B2 does NOT re-measure what B1 settled (the ceilings,
-the device-memory accounting, the 65k capacity workload).
+Needs an idle machine; the full run takes about 5 h.
 
-BLOCK 1 — isochronal recall cost, both modes.
-  gamma and delta per mode, and specifically whether delta DIFFERS between them.
-  Targets n_spill in {512, 1024, 2048, 4096, 8192} x {CPU-pinned,
-  device-visible}, plus a no-spill reference per mode. 3 trials each, EXCEPT
-  n_spill=4096 CPU-pinned which gets 5: that point ranged 44.0-60.9 ms in the
-  earlier sweep where every other point repeated under 0.5 ms, and background
-  machine activity is a plausible cause. This either deletes the mystery or
-  confirms it on a quiet machine.
+Block 1: isochronal recall cost, both tiers.
+  The fixed and per-cell terms for each tier, and whether the per-cell term
+  differs between them. Targets n_spill in {512, 1024, 2048, 4096, 8192} x
+  {CPU-pinned, device-visible}, plus a no-spill reference per tier, 3 trials
+  each, except CPU-pinned n_spill = 4096, which gets 5: that point ranged from
+  44.0 to 60.9 ms in an earlier sweep where every other point repeated within
+  0.5 ms, and background activity was a plausible cause.
 
-  Reports per mode: affine fit, slope standard error, residual SD. Then tests
-  whether the two slopes are separable given those standard errors. "delta fell
-  by half" has to survive that test; if it does not, the analysis says the
-  direction is unresolved rather than quoting a difference the fits cannot
-  support.
+  Reports per tier the affine fit, slope standard error and residual SD, then
+  tests whether the two slopes are separable given those standard errors; if
+  they are not, it says the direction is unresolved rather than quoting a
+  difference. It also checks that the two no-spill references agree: with
+  nothing spilled the tier is inactive, so a disagreement would mean the buffer
+  allocation does something while idle.
 
-  Also checks that the two no-spill references agree. With nothing spilled the
-  tier is inactive and the modes should be identical; a disagreement would mean
-  the buffer allocation does something at idle, which would need explaining.
+  This block is instrumented by necessity, since the per-step wall clock is the
+  measurement. It reports ms/step, not a tok/s headline.
 
-  This block is INSTRUMENTED by necessity -- per-step wall clock IS the
-  measurement here. It reports ms/step, not a tok/s headline, so the
-  uninstrumented rule (which exists to protect tok/s numbers) is not violated.
+Block 2: policy comparison, five arms, C in {1024, 2048}, 3 trials.
+  Upstream (halts), rolling window, H2O, exact retention CPU-pinned, exact
+  retention device-visible. Uninstrumented.
 
-BLOCK 2 — policy comparison, five arms, C in {1024, 2048}, 3 trials.
-  upstream (halts) / rolling window / H2O / exact retention CPU-pinned /
-  exact retention device-visible. Supersedes the 8-arm block; not spliced
-  against it or against the interleaved A/B.
+  The CPU-pinned arm is position-balanced rather than randomized: it drifted
+  -23% across the counterbalanced session against -6% and -10% for the arms on
+  the accelerator, so an unlucky draw could put the most thermally sensitive
+  arm in the trough. Its six runs are spread one per sixth of the block; every
+  other arm is randomized normally.
 
-  The CPU-pinned arm is POSITION-BALANCED rather than randomised: it drifted
-  -23% across the A/B session against -6% and -10% for the GPU-resident arms, so
-  an unlucky draw would land the most thermally fragile arm in the trough. Its
-  six runs are spread one per sixth of the block; every other arm is randomised
-  normally. Uninstrumented.
-
-Protocol: seed 123, temp 0, greedy, EOS disabled, flash attention off
+Protocol: seed 123, temperature 0 (greedy), EOS disabled, flash attention off
 everywhere and verified per run from its own log, 200 s cooldowns.
 
-Run:  python3 scripts/run_b2_cooled.py             (both blocks, ~5 h)
-      UNIKV_B2=1 python3 scripts/run_b2_cooled.py  (block 1 only, ~2.5 h)
-      UNIKV_B2=2 python3 scripts/run_b2_cooled.py  (block 2 only, ~2.1 h)
+  python3 scripts/run_b2_cooled.py             (both blocks, about 5 h)
+  UNIKV_B2=1 python3 scripts/run_b2_cooled.py  (block 1 only, about 2.5 h)
+  UNIKV_B2=2 python3 scripts/run_b2_cooled.py  (block 2 only, about 2.1 h)
+
+UNIKV_ISO_TARGETS adds the small plateau targets (8, 32, 128) and
+UNIKV_B2_ROUNDS=1 runs block 1 as a randomized complete block; the plateau
+blocks used both. UNIKV_MODEL and UNIKV_TAG run another model through the same
+code.
 
 Before running: machine idle, screensaver off, Spotlight and Time Machine
-paused. Contention lands asymmetrically on the CPU-pinned arm, which biases
-toward confirming the hypothesis.
+paused. Contention lands unevenly on the CPU-pinned arm.
 """
 
 import csv
@@ -68,8 +64,8 @@ BIN_DIR        = LLAMA_DIR / "build-m4pro-metal" / "bin"
 COMPLETION_BIN = BIN_DIR / "llama-completion"
 TOKENIZE_BIN   = BIN_DIR / "llama-tokenize"
 
-# MODEL AND TAG ARE OVERRIDABLE so a second model runs THIS code path rather than
-# a forked copy of it. With both unset the Llama block reproduces byte for byte.
+# Model and tag can be overridden, so another model runs this code path rather
+# than a copy of it. With both unset, the Llama block reproduces byte for byte.
 #   UNIKV_MODEL      absolute path to the .gguf            (default: Llama 3.1 8B)
 #   UNIKV_TAG        output-name prefix and artifacts dir  (default: b2)
 #   UNIKV_ISO_EXTRA  0 disables the 5-trial exception at CPU-pinned n_spill=4096,
@@ -101,7 +97,7 @@ ISO_CTX     = 1024
 ISO_TARGETS = [int(x) for x in os.environ.get(
     "UNIKV_ISO_TARGETS", "0,512,1024,2048,4096,8192").split(",")]
 # UNIKV_ISO_TARGETS lets a block add small targets (8, 32, 128) so gamma can be
-# fitted LOCALLY instead of extrapolated back from 512+, where the CPU-pinned
+# fitted locally instead of extrapolated back from 512+, where the CPU-pinned
 # arm carries almost all of its variance.
 ISO_BURST   = 128
 ISO_WARMUP  = 32          # drops the one-off graph-realloc step after prefill
@@ -138,12 +134,12 @@ def count_tokens(path: Path) -> int:
 
 
 def ensure_prompt(n: int) -> Path:
-    """A prompt of EXACTLY n tokens under whichever tokenizer MODEL_PATH carries.
+    """A prompt of exactly n tokens under whichever tokenizer MODEL_PATH carries.
 
     The original form assumed FIXED_TOKEN is one token and that the tokenizer adds
     exactly one BOS, which held for Llama 3.1 and need not hold for another model.
     This solves for the repeat count instead and still fails loudly if it cannot
-    land on n exactly — the isochronal design depends on the prompt length, so an
+    land on n exactly: the isochronal design depends on the prompt length, so an
     approximate prompt would silently change the spilled-set size.
     """
     PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -236,9 +232,9 @@ def launch(prompt, ctx, policy, dev, gen, tag, steplog, spill_cap):
 # ============================ BLOCK 1 =======================================
 def block1():
     print("== BLOCK 1: isochronal recall cost, both tier modes ==")
-    # UNIKV_B2_ROUNDS=1 -> randomised COMPLETE block: each round is a fresh
+    # UNIKV_B2_ROUNDS=1 -> randomized complete block: each round is a fresh
     # permutation of every cell, so target and tier mode are orthogonal to
-    # execution position BY CONSTRUCTION rather than by a lucky global shuffle.
+    # execution position by construction rather than by a lucky global shuffle.
     # Default (unset) keeps the single global shuffle the Llama and Qwen blocks
     # used, so those remain reproducible from this script.
     complete = os.environ.get("UNIKV_B2_ROUNDS", "0") == "1"
@@ -395,7 +391,7 @@ def block1():
 
 # ============================ BLOCK 2 =======================================
 def build_block2_plan():
-    """Randomised, except the CPU-pinned arm which is position-balanced."""
+    """Randomized, except the CPU-pinned arm, which is position-balanced."""
     balanced, others = [], []
     for ctx in POL_CTXS:
         for arm in POLICY_ARMS:

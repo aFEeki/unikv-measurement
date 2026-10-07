@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-"""Corrected recall-cost fit — subtract the measured thermal drift, per target.
+"""Recall-cost fit with the measured thermal drift subtracted, per target.
 
-Every quantity here comes from stress_results/thermal_control_block.csv, which
-contains BOTH the isochronal arms and their matched constant-work controls in one
-randomised complete block. Nothing is combined across blocks.
+Every quantity comes from stress_results/thermal_control_block.csv, which holds
+both the isochronal arms and their matched constant-work controls in one
+randomized complete block. Nothing is combined across blocks.
 
   thermal(dev, target, round) = ctrl_ms(dev, target, round) - ctrl_ms(dev, 0, round)
 
-      the control does identical work per step at every target; the only thing
+      The control does the same work per step at every target; the only thing
       that differs is how long the machine has been under load when its band is
-      measured. So this difference is drift, not work.
+      measured, so this difference is drift, not work.
 
   corrected(run) = iso_ms(run) - thermal(dev, target, round of that run)
 
-      paired WITHIN round, so a round that ran warm corrects with its own control.
+      Paired within round, so a round that ran warm is corrected with its own
+      control.
 
-The fit then follows artifacts/b2_cooled/REGRESSION_SPEC.txt: per-run
-observations, measured n_spill_mean as the regressor, target > 0 only, gamma =
-intercept minus that arm's own no-spill reference.
+The fit then follows the same procedure as analyze_isochronal.py: per-run
+observations, the measured n_spill_mean as regressor, target > 0 only, and the
+intercept reported against that arm's own no-spill reference.
 """
 
 import csv, math, statistics as st, sys

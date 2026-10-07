@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
-"""gamma from directly measured small targets vs gamma from the published extrapolation.
+"""Fixed charge from the small spill targets, against the extrapolated one.
 
-gamma is currently obtained by extrapolating the affine fit back to n_spill = 0
-and subtracting the no-spill mean, from blocks whose lowest spilling target is
-512. That is an extrapolation into a region with no data, computed from the
-noisiest cells in the block.
+The main isochronal blocks start spilling at target 512, so the fixed charge
+they give comes from extrapolating the affine fit back to n_spill = 0 and
+subtracting the no-spill mean: an extrapolation into a region with no data,
+from the noisiest cells in the block.
 
 This compares, per model and per tier:
-  gamma_local      plateau of the small targets MINUS THAT BLOCK'S OWN no-spill
-                   reference. Slope-free, because the small region is measured
-                   flat (see the 1B block); a local OLS slope there is noise.
-  gamma_published  published global-fit intercept MINUS THAT BLOCK'S OWN
+  gamma_local      mean over the small targets (8, 32, 128) minus that block's
+                   own no-spill reference. No slope is fitted, because the small
+                   region is flat (see the 1B block); a local OLS slope there is
+                   noise.
+  gamma_published  the main block's global-fit intercept minus that block's own
                    no-spill reference.
 
-BOTH ARE WITHIN-BLOCK DIFFERENCES, so each block's level offset cancels before
-the two are compared. No level is ever spliced across sessions.
+Both are differences within one block, so each block's level offset cancels
+before the two are compared, and no level is carried from one session to
+another. If they agree, the affine form holds down to zero spilled cells; if
+not, the extrapolated value is partly an artifact of the fit. The script also
+reports whether the small region is flat, as the change from the smallest to
+the largest small target.
 
-The affine-form check is then simply whether the two agree: if the extrapolation
-lands where the plateau actually is, the form holds to zero; if not, the
-published gamma is partly a fit artifact.
+Table 2's fixed charges start from the same plateau; analyze_resident_baseline.py
+then subtracts the resident cost of the extra cells a plateau run holds.
 """
 import csv, math, statistics as st, sys
 from pathlib import Path

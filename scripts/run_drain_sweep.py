@@ -1,39 +1,40 @@
 #!/usr/bin/env python3
-"""Block 4 — drained AND undrained across the full alpha range, in ONE block.
+"""Drained and undrained series across the whole alpha range, in one block.
 
-Section 6 names this experiment: "a block running drained points beyond
-alpha = 0.25 alongside the undrained ones would settle it." Everything known
-about the drain cost today comes from three coefficients measured in two
-different blocks:
+Before this block, the drain cost came from three coefficients measured in two
+blocks:
 
-    alpha = 0.00   ~0        (t = 1.11 and -0.76, two blocks, never significant)
+    alpha = 0.00   about 0   (t = 1.11 and -0.76, two blocks, never significant)
     alpha = 0.25   +0.713    (t = 10.5, block 1)
     alpha = 1.00   +0.981    (t = 3.97, block 2)
 
-and the fig7 provenance note refuses to splice the two series because the blocks
-agree on level but not on drained slope (t = -2.6). Running both series across
-alpha in {0, 0.25, 0.5, 1, 2} inside ONE randomised complete block removes the
-need to splice and settles two things the paper currently declines to state:
+and the two series could not be combined, because the blocks agreed on level
+but not on drained slope (t = -2.6). Running both series at alpha in
+{0, 0.25, 0.5, 1, 2} inside one randomized complete block removes the need to
+combine them and answers two questions:
 
-  (a) whether there is real curvature in the first quarter of the alpha range,
-      which the cross-block slope disagreement hinted at but could not separate
-      from a block effect;
-  (b) the SHAPE of the drain cost, which is currently three points from two
-      sessions rather than a curve.
+  (a) whether the drained series curves within the first quarter of the alpha
+      range, which the cross-block slope disagreement suggested but could not
+      separate from a block effect;
+  (b) the shape of the drain cost across the range, rather than three points
+      from two sessions.
 
-UNIKV_DRAIN semantics (llama-context.cpp):
-  unset -> drain iff alpha > 0   (the published behaviour)
+Table 7 of the paper lists the result as block 3: the drain cost is zero at
+alpha = 0, rises, and then saturates.
+
+UNIKV_DRAIN (llama-context.cpp):
+  unset -> drain if alpha > 0 (the default)
   1     -> drain even at alpha = 0
   0     -> never drain, even at alpha > 0
-So the drained series needs the override only at alpha=0, and the undrained
-series needs it everywhere except alpha=0. Each run records which setting it got
-so the CSV carries the evidence rather than the harness source.
+The drained series needs the override only at alpha = 0, and the undrained
+series needs it everywhere except alpha = 0. Each run records its setting, so
+the CSV carries the evidence rather than the harness source.
 
-Protocol identical to the drain-control blocks: policy 3, C=1024, 512-token
-prompt, 2048 decoded tokens, -fa off parsed per run, greedy, seed 123, EOS
-disabled, UNINSTRUMENTED (UNIKV_LOG synchronizes at both ends of every decode
-call and would drain the arms whose whole point is that they do not).
-Randomised COMPLETE block: each round a fresh permutation of all ten cells.
+Protocol as in the drain-control blocks: policy 3, C = 1024, 512-token prompt,
+2048 decoded tokens, -fa off parsed per run, greedy, seed 123, EOS disabled,
+and uninstrumented (UNIKV_LOG synchronizes at both ends of every decode call
+and would drain the arms that must not drain). Randomized complete block: each
+round is a fresh permutation of all ten cells.
 """
 
 import csv, datetime, math, os, random, re, statistics as st, subprocess, sys, time

@@ -7,14 +7,14 @@ Reads, per model:
                                               at UNIKV_COPY_REPS 0, 1, 2
   stress_results/resident_baseline_<m>.csv   the resident slope, to price the
                                               568 cells a plateau run holds
-                                              beyond its reference (Table 3)
+                                              beyond its reference (Table 2)
 
 Per tier:
   copy by difference   reps 1 - reps 0 (the copy's full cost) and reps 2 - reps 1
                        (one more, identical copy); standard errors from the
                        three runs per cell
   copy directly        copy_us, the timed copy loop, mean over runs
-  fixed charge         reps 1 - reference - 568 x resident slope, the Table 3
+  fixed charge         reps 1 - reference - 568 x resident slope, the Table 2
                        definition, re-measured inside this block
   without the copy     reps 0 - reference - 568 x resident slope
   share                copy by difference / fixed charge, and by the timer. On

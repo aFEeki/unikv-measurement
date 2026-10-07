@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-"""UniKV R2 alpha sweep on policy 3 (recall-cost model). Supersedes the §3
-policy-1 alpha numbers.
+"""Alpha sweep on exact retention (policy 3): a simulated per-step recall cost.
 
-alpha now prices the PER-STEP RECALL of the spilled tier, not the shift:
-each decode step with n_spilled > 0 injects delay = alpha * (n_spilled *
-per_cell_KV_bytes) / 64 GB/s, with synchronize() before the sleep. alpha=0 is
-the un-synced unified-memory reference (no per-step drain); alpha>0 models a
-blocking discrete-memory recall (drain + delay). The alpha=0 -> alpha>0 step is
-real physics (non-blocking shared memory -> blocking PCIe), not an artifact.
+alpha prices the per-step recall of the spilled tier, not the demotion: each
+decode step with n_spilled > 0 sleeps for
+alpha * (n_spilled * per-cell KV bytes) / 64 GB/s, after a synchronize().
+alpha = 0 therefore runs without the per-step drain and every alpha > 0 runs
+with it, so the step from alpha = 0 to alpha > 0 mixes the injected delay with
+the cost of the drain. run_drain_control.py, run_drain_alpha1.py and
+run_drain_sweep.py separate the two (Appendix A of the paper).
 
-Methodology mirrors the original sweep: 7 alphas x 5 trials = 35 runs in
-randomized-block order (fixed shuffle seed, order printed for audit) so
-time-correlated thermal drift decorrelates from alpha instead of aliasing onto
-it. Records e2e tok/s + a wall-clock timing log per run.
+Design: 7 alphas x UNIKV_SWEEP_TRIALS trials (default 5) in randomized-block
+order, with a fixed shuffle seed and the order printed, so time-correlated
+thermal drift spreads across alphas instead of aliasing onto them.
+UNIKV_SWEEP_COOLDOWN adds a cooldown before every run; the cooled sweep used it.
+Records e2e tok/s and a wall-clock timing log per run.
 
-Config: policy 3, C=1024, 512-token prompt + 2048 decode, -fa off, seed 123,
---ignore-eos. Every run must complete the full 2048 (lossless) and sit under the
-58 tok/s ceiling.
+Config: policy 3, C = 1024, 512-token prompt and 2048 decoded tokens, -fa off,
+seed 123, --ignore-eos. Every run must complete all 2048 tokens and stay under
+the 58 tok/s ceiling.
 """
 
 import csv

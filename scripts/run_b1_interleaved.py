@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
-"""Interleaved A/B/C for the device-visible spilled tier (B1 verification).
+"""Counterbalanced A/B/C for the device-visible tier: the design Section 3 of the paper reports as failing.
 
-The +24% and the resulting sub-10% exactness premium against H2O currently rest
-on single uncooled runs taken sequentially, on a machine that was in active use.
-Sequential single runs cannot distinguish a treatment effect from drift between
-them.
+Three arms run in a rotated order every round, so each arm takes each position
+roughly equally and any monotone drift (thermal or load) cancels across rounds
+instead of landing on whichever arm ran last. The machine is not cooled
+between runs, and the absolute levels are uncooled.
 
-This does not fix that by cooling -- it fixes it by COUNTERBALANCING. Three arms
-are run in a rotated order every round, so each arm occupies each position in the
-round roughly equally and any monotone drift (thermal or load) cancels across
-rounds instead of loading onto whichever arm ran last. That makes the DIFFERENCES
-robust without waiting for an idle machine; the absolute levels are still
-uncooled and are not protocol numbers.
-
-Arms, all at C=1024, -fa off, uninstrumented:
-  A  p3 CPU-pinned spilled tier   (the published configuration)
-  B  p3 device-visible tier       (UNIKV_SPILL_DEV=1)
-  C  p4 H2O                       (the comparator the premium is measured against)
+Arms, all at C = 1024, -fa off, uninstrumented:
+  A  p3, CPU-pinned spilled tier
+  B  p3, device-visible tier (UNIKV_SPILL_DEV=1)
+  C  p4, H2O, the comparator for the exactness premium
 
 Round orders rotate: ABC, BCA, CAB, CBA.
+
+Counterbalancing handles order, not arms that throttle at different rates. The
+CPU-pinned arm drifted far more than the others across the session, and this
+design overstated the device-visible speedup (+46.5% against a cooled +25.9%)
+and understated the premium against H2O (+7.8% against a cooled +11.4%). The
+cooled numbers come from run_b2_cooled.py.
 """
 
 import csv

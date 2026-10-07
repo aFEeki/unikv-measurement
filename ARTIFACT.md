@@ -28,8 +28,10 @@ Two archives, both needed:
 Model weights: runs use Llama 3.1 8B, Qwen2.5 7B, Llama 3.2 3B and Llama 3.2 1B,
 all Instruct at Q4_K_M and fetched separately, and nothing in the artifact
 modifies a model. Build output: the fork must be built locally, since the build
-tree is several GB and machine-specific. The paper source: the data and
-harnesses make the measurements checkable on their own.
+tree is several GB and machine-specific. Raw logit dumps and per-run logs: the
+harnesses write them under `artifacts/`, about 5 GB in total, and the CSVs
+derived from them are here. The paper source: the data and harnesses make the
+measurements checkable on their own.
 
 ## Reproducing
 
@@ -83,5 +85,6 @@ replaced. They are kept, and the paper quotes none of them.
 ## License
 
 Harnesses under `scripts/`: MIT (`LICENSE`). Result files and figures:
-CC-BY-4.0 (`LICENSE-DATA`). The `llama.cpp` fork inherits upstream's MIT license
-and retains its attribution.
+CC-BY-4.0 (`LICENSE-DATA`); text the models generated stays under each model's
+own license. The `llama.cpp` fork inherits upstream's MIT license and retains
+its attribution.

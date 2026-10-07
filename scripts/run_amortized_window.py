@@ -1,37 +1,41 @@
 #!/usr/bin/env python3
-"""Review item M1 — the shipped amortization, and a re-verification of the ablation.
+"""Discard granularity of the rolling window, and a re-check of the re-encoding gate.
 
-M1: the fork's policy 1 discards n_tokens_all (one token per decode step), so a
-2048-token generation at C=1024 pays ~1535 shift events. Upstream's
---context-shift discards n_left/2 — roughly half the window — and pays a handful.
-They are not the same policy, and the re-encode cost measured in Section 8 is not
-one a --context-shift user pays. UNIKV_WINDOW_DISCARD=-1 sets n_discard = C/2.
+The fork's policy 1 discards one token per decode step, so a 2048-token
+generation at C = 1024 pays about 1535 shift events. Upstream's --context-shift
+discards n_left/2, about half the window, and pays a handful. They are not the
+same policy, and the re-encoding cost the per-token window pays is not one a
+--context-shift user pays. UNIKV_WINDOW_DISCARD=-1 sets n_discard = C/2.
 
-This block also RE-VERIFIES the reconstructed UNIKV_NO_REENCODE gate, which was
-lost from src/ after the published ablation ran. Acceptance is semantic, not a
-string match: the within-block recovery must reproduce (published +1.075 tok/s at
-C=1024 and +0.695 at C=2048). Absolute rates will not match the published block —
-session offset — which is why the paper only ever compares within a block.
+The block also re-checks the UNIKV_NO_REENCODE gate, which had to be rebuilt
+after the original ablation ran. Acceptance is semantic, not a string match:
+the within-block recovery must reproduce the published +1.075 tok/s at
+C = 1024 and +0.695 at C = 2048. Absolute rates will not match the published
+block, because sessions differ in level, which is why the paper only compares
+within a block.
 
-ARMS (C in {1024, 2048}, 3 rounds):
+Arms (C in {1024, 2048}, 3 rounds):
   p1_window       per-token discard, the published policy 1
-  p1_noreencode   per-token discard, K-shift pass skipped (INSTRUMENT, output invalid)
-  p1_amortized    n_discard = C/2, upstream's amortization          <- M1's new arm
-  p4_h2o          H2O eviction, the comparator Section 8 uses
+  p1_noreencode   per-token discard, re-encoding skipped (an instrument; the
+                  output is invalid)
+  p1_amortized    n_discard = C/2, upstream's amortization
+  p4_h2o          H2O eviction, the comparator
 
-THE PREDICTION, as a BRACKET rather than a point value. If the window's excess
-over H2O is entirely PER-EVENT cost, amortizing to a handful of events should
-remove essentially all of it and p1_amortized should land at H2O's level
-(41.9-42.5 tok/s at C=1024). If part of the residue is per-step regardless of
-event count, it lands lower (39.9-40.3). The measurement discriminates.
+The prediction, stated as a bracket before the run: if the window's excess over
+H2O is entirely per-event cost, amortizing to a handful of events removes nearly
+all of it and p1_amortized lands at H2O's level (41.9 to 42.5 tok/s at
+C = 1024). If part of it is per-step regardless of event count, p1_amortized
+lands lower (39.9 to 40.3).
 
-Randomised COMPLETE block: each round is a permutation of all 8 cells, so arm is
-orthogonal to position by construction. 200 s cooldowns, uninstrumented,
-512-token prompt, 2048 decode, -fa off parsed per run, greedy, seed 123.
+Randomized complete block: each round is a permutation of all eight cells, so
+arm is orthogonal to position by construction. 200 s cooldowns,
+uninstrumented, 512-token prompt, 2048 decoded tokens, -fa off parsed per run,
+greedy, seed 123.
 
-EVENT CENSUS: shift-event counts are STRUCTURAL (deterministic, thermally
-invariant), so they are counted afterwards in a short instrumented pass rather
-than inside the cooled block, where UNIKV_LOG's synchronize would corrupt rates.
+Shift-event counts are structural (deterministic and independent of
+temperature), so they are counted afterwards in a short instrumented pass
+rather than inside the cooled block, where UNIKV_LOG's synchronize() would
+distort the rates. Appendix B of the paper reports the results (Table 9).
 """
 
 import csv, datetime, math, os, random, re, statistics as st, subprocess, sys, time

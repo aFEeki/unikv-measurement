@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""
-Phase 3B stress benchmark — exercises the UniKV shift policy by forcing KV cache
-overflow during decode, not prefill.
+"""Earliest stress benchmark: the rolling window (policy 1) against the halting baseline.
 
-Design: 512-token prompt + 2048 decode tokens at ctx=[1024, 2048, 4096].
-  ctx=1024: overflows at decode step ~513 (512 prompt + 512 decode fills cache)
-  ctx=2048: overflows at decode step ~1537 (512 prompt + 1536 decode fills cache)
-  ctx=4096: no overflow (512+2048=2560 < 4096)
+Forces a KV cache overflow during decode rather than prefill: a 512-token prompt
+and 2048 decoded tokens at ctx in {1024, 2048, 4096}.
+  ctx = 1024  overflows at decode step about 513 (512 + 512 fills the cache)
+  ctx = 2048  overflows at decode step about 1537 (512 + 1536 fills the cache)
+  ctx = 4096  no overflow (512 + 2048 = 2560 < 4096)
 
-Each context size runs twice:
-  UNIKV_POLICY=0  (baseline, expected to fail/stop at overflow)
-  UNIKV_POLICY=1  (UniKV, shifts and continues)
+Each context runs twice:
+  UNIKV_POLICY=0  the unmodified runtime, which stops at the overflow
+  UNIKV_POLICY=1  the rolling window, which shifts and continues
+
+The paper's policy comparison comes from block 2 of run_b2_cooled.py.
 """
 
 from __future__ import annotations
@@ -225,7 +226,7 @@ def analyze(ctx_size: int) -> None:
             return 0.0
         return sum(float(r["tok_per_sec"]) for r in decode) / len(decode)
 
-    # -- end-to-end decode tok/s (HEADLINE: single GPU sync after the loop) --
+    # -- end-to-end decode tok/s (the main metric: one GPU sync after the loop) --
     b_e2e = read_e2e_tps(RESULTS_DIR / f"stress_baseline_{ctx_size}_e2e.csv")
     p_e2e = read_e2e_tps(RESULTS_DIR / f"stress_policy_{ctx_size}_e2e.csv")
     print(f"    end-to-end tok/s  — baseline: {b_e2e:.2f},  policy: {p_e2e:.2f}   [HEADLINE]")

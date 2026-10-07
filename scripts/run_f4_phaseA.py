@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
-"""Phase A — closing the asserted-but-unmeasured gaps in Finding 4 (capacity).
+"""The capacity finding's three supporting sweeps (A1, A2, A3).
 
-Three sub-runs, selected with UNIKV_F4=A1|A2|A3 (comma-separated, default all).
-Outcomes here are binary or coarse (completes / out of memory / a buffer size in
-MiB), so thermal state is irrelevant and no cooldowns are used.  Memory pressure
-is kept low because an out-of-memory outcome is decided by working-set size.
+Selected with UNIKV_F4=A1|A2|A3 (comma-separated; default all). Outcomes are
+binary or coarse (completes, out of memory, a buffer size in MiB), so thermal
+state does not matter and no cooldowns are used. Memory pressure from other
+processes is kept low, because an out-of-memory outcome depends on working-set
+size.
 
-A3  Flash-attention-on capacity re-run.  Finding 4's ceiling is measured with
-    flash attention off, to match the spill path.  The draft then ASSERTS that a
-    fused build reaches a higher C, and separately that the 65536-token workload
-    has no upstream setting that runs it.  Those two statements are in tension:
-    if the fused kernel removes the scratch term, upstream may well run the
-    workload after all.  Run first because it is cheap and because a positive
-    result changes the finding's headline.
+A3  Flash attention on, at the 65,536-token workload. The capacity ceiling is
+    measured with flash attention off, to match the spill path, so whether a
+    fused build reaches a larger C, and then runs the workload, has to be
+    measured. It does: upstream at ubatch 512 and C = 73728 completes the
+    workload losslessly (Table 6). Runs first because it is cheap.
 
-A1  ubatch sweep.  The scratch term is n_kv x n_ubatch x n_head, so it scales
-    with ubatch and ubatch therefore moves the ceiling and the 193 KiB/token
-    accounting.  For each ubatch, walk C upward until the driver refuses, giving
-    a per-ubatch ceiling and a per-ubatch scratch coefficient.
+A1  ubatch sweep. The scratch term is n_kv x n_ubatch x n_head, so ubatch moves
+    the ceiling and the per-token device cost. For each ubatch, C is raised
+    until the driver refuses, giving a per-ubatch ceiling and scratch
+    coefficient (Table 5, Figure 3).
 
-A2  Continuation-policy arms for the 65536-token workload.  The draft states
-    that the rolling window and H2O would also complete it at a small C by
-    discarding context.  Asserted, not measured.  Measuring it turns the claim
-    into "what is unavailable at any upstream setting is completing it
-    losslessly", which is the claim the paper actually wants.
+A2  The other routes through the 65,536-token workload. The rolling window and
+    H2O complete it at C = 4096 by discarding context, and upstream at ubatch
+    64 and C = 81920, flash attention off, completes it losslessly (Table 6).
 
-Protocol: seed 123, temp 0, greedy, --ignore-eos, -fit off, and the flash_attn
-setting parsed back out of each run's own log rather than trusted from here.
-Nothing in A1/A3 produces a tok/s headline; A2 does, so A2 runs uninstrumented.
+Protocol: seed 123, temperature 0 (greedy), --ignore-eos, -fit off, and the
+flash attention setting parsed from each run's own log. A1 and A3 produce no
+tok/s figure; A2 does, so A2 runs uninstrumented.
 """
 
 import csv
@@ -43,7 +40,7 @@ LLAMA_DIR      = ROOT / "llama.cpp"
 BIN_DIR        = LLAMA_DIR / "build-m4pro-metal" / "bin"
 COMPLETION_BIN = BIN_DIR / "llama-completion"
 TOKENIZE_BIN   = BIN_DIR / "llama-tokenize"
-# Model/tag overridable so a second model runs THIS code path; unset = Llama.
+# Model and tag can be overridden, so another model runs this code path; unset = Llama.
 MODEL_PATH  = Path(os.environ.get(
     "UNIKV_MODEL", LLAMA_DIR / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"))
 TAG         = os.environ.get("UNIKV_TAG", "")
@@ -69,7 +66,7 @@ A1_CTX    = [int(x) for x in os.environ.get(
                  "UNIKV_F4_CTX", "49152,65536,81920,98304,131072").split(",")]
 A1_PROMPT = int(os.environ.get("UNIKV_F4_A1_PROMPT", "16384"))
 
-# A2/A3: the workload Finding 4 says upstream cannot run
+# A2/A3: the 65,536-token workload of Table 6
 BIG_PROMPT = int(os.environ.get("UNIKV_F4_BIG_PROMPT", "65536"))
 BIG_GEN    = int(os.environ.get("UNIKV_F4_BIG_GEN", "32"))
 
@@ -161,7 +158,7 @@ def run(tag, prompt, ctx, policy, fa, ubatch, batch, gen,
     model  = g(r"MTL0_Mapped model buffer size\s*=\s*([\d.]+)", float)
     comp   = g(r"MTL0 compute buffer size\s*=\s*([\d.]+)", float)
     budget_mb = g(r"recommendedMaxWorkingSetSize\s+=\s+([\d.]+)", float)
-    # ggml prints this in DECIMAL MB; our footprints are MiB. Convert, or every
+    # ggml prints this in decimal MB; our footprints are MiB. Convert, or every
     # ratio comes out 4.9% low.
     budget = budget_mb * 1e6 / 2**20 if budget_mb else None
     device = sum(x for x in (kv, model, comp) if x)
@@ -211,7 +208,7 @@ def main() -> int:
     for d in (RESULTS_DIR, LOGS_DIR, PROMPTS_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
-    # ---------------- A3: flash attention ON at the big workload -------------
+    # ---------------- A3: flash attention on at the big workload -------------
     if "A3" in WHICH:
         print("== A3: does a fused (flash-attention-on) upstream build run the "
               f"{BIG_PROMPT}-token workload? ==")
@@ -273,7 +270,7 @@ def main() -> int:
                 ("A2_p4_c4096", 4, 4096, 512, None, "H2O fixed-budget eviction"),
                 # A1 showed the scratch term scales with ubatch, so ubatch moves
                 # the ceiling as much as the kernel choice does. If a small-ubatch
-                # upstream config holds this prompt with flash attention OFF, then
+                # upstream config holds this prompt with flash attention off, then
                 # "no upstream setting runs it" is false even on the non-fused
                 # path, independently of the A3 result.
                 ("A2_p0_c81920_ub64", 0, 81920, 64, None,

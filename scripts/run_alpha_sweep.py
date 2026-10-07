@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""
-Phase 4 alpha sweep — measures how UniKV's continuous-generation advantage
-degrades as transfer cost (PCIe simulation) increases.
+"""Early alpha sweep on the rolling window (policy 1); run_alpha_sweep_p3.py replaced it.
 
-Setup mirrors the Phase 3B stress benchmark: 512-token prompt + 2048 decode
-tokens at ctx=1024 (the confirmed-overflow case).
+Prices a simulated inter-tier transfer with UNIKV_ALPHA and records how decode
+throughput falls as alpha rises. Workload as in run_stress_benchmark.py: a
+512-token prompt and 2048 decoded tokens at ctx = 1024, which overflows during
+decode.
 
-For each alpha in [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0] we run UNIKV_POLICY=1
-once. We additionally run UNIKV_POLICY=0 once as a "stops at cache full"
-reference. After all runs, we print:
+Each alpha in [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0] runs under UNIKV_POLICY=1
+for TRIALS_PER_ALPHA trials in randomized-block order, plus one UNIKV_POLICY=0
+run as the reference that stops when the cache fills. It then prints
+
   alpha | mean_tok_per_sec | total_shifts | notes
 
-The key paper claim (and what we want to see): mean tok/s should decrease
-monotonically as alpha increases, demonstrating the crossover where the
-unified-memory advantage shrinks under simulated PCIe cost.
+The paper does not use these numbers. Policy 1 is not the retention policy, and
+the later blocks showed that every alpha > 0 run also pays a pipeline drain that
+the alpha = 0 run does not (Appendix A of the paper).
 """
 
 from __future__ import annotations
@@ -262,7 +263,7 @@ def mean_decode_tps(rows: list[dict[str, str]]) -> float:
 
 
 def read_e2e_tps(path: Path) -> float:
-    """End-to-end decode throughput (single GPU sync after the loop). HEADLINE."""
+    """End-to-end decode throughput (single GPU sync after the loop); the main metric."""
     rows = read_csv_rows(path)
     return float(rows[-1]["tok_per_sec"]) if rows else 0.0
 
@@ -344,7 +345,7 @@ def summarize() -> None:
           f"{base_tps:>7.2f} | {1:>2d} | {base_shifts:>7d} | "
           f"UNIKV_POLICY=0, stops at cache full")
 
-    # Report the trend as measured; do NOT smooth toward monotonicity. Mark an
+    # Report the trend as measured; do not smooth toward monotonicity. Mark an
     # uptick only as "within noise" or "EXCEEDS noise" relative to the pooled
     # std of the two adjacent alphas, so the reader judges significance.
     print("\nTrend (mean +/- std e2e tok/s vs alpha; noise NOT smoothed):")

@@ -1,31 +1,26 @@
 #!/usr/bin/env python3
-"""Where a device-visible spilled tier meets the Finding 4 working-set wall.
+"""Where the device-visible spilled tier meets the working-set budget.
 
-Device-visibility is not free: the tier is allocated from the Metal shared
-buffer type, so it counts against the same advisory working set whose crossing
-Finding 4 shows is refused at execution. The CPU-pinned tier does not, which is
-the whole reason the pin exists.
+A device-visible tier is allocated from the Metal shared buffer type, so it
+counts against the same advisory working set whose crossing is refused at
+execution (Section 6 of the paper). The CPU-pinned tier does not, which is the
+reason the pin exists. The ceiling is therefore the other half of the trade
+between the two tiers, and it has to be measured.
 
-That makes the ceiling the other half of the trade, not a caveat on it. The
-statement the paper wants is "device-visibility buys throughput until spill
-capacity pushes the working set into the wall, which happens at X cells", and X
-has to be measured.
+Method: fix C = 1024 (128 MiB of resident KV) and raise UNIKV_SPILL_CAP in both
+modes, with a workload that actually spills, recording where each stops working
+and how. The tier is allocated at capacity rather than occupancy, so the charge
+lands up front and the ceiling is a property of the cap, not of how much has
+spilled.
 
-Method. Fix C=1024 (128 MiB of resident KV) and walk UNIKV_SPILL_CAP upward in
-both modes, with a workload that actually spills, recording where it stops
-working and how. The store is allocated at CAPACITY rather than occupancy, so
-the charge lands up front and the ceiling is a property of the cap, not of how
-much has spilled.
+The accounting predicts the wall: model 4685 + KV 128 + compute 258 MiB leaves
+about 11300 MiB under the budget, so at 128 KiB per cell the device-visible
+tier should meet it near 90000 cells. The run tests that prediction rather than
+assuming it.
 
-Predicted from the measured accounting: model 4685 + KV 128 + compute 258 leaves
-about 11312 MiB under the 16383 MiB advisory budget, so at 128 KiB per cell the
-device-visible tier should meet the wall near 90000 cells. Finding 4's lesson is
-that predictions like that name the wrong wall, which is exactly why this is a
-measurement.
-
-Both modes are run at every capacity so the contrast is paired: the CPU-pinned
-arm is expected to sail past the point where the device-visible arm stops.
-Outcomes are categorical, so no cooldowns.
+Both modes run at every capacity, so the contrast is paired: the CPU-pinned arm
+is expected to continue past the point where the device-visible arm stops.
+Outcomes are categorical, so there are no cooldowns.
 """
 
 import csv

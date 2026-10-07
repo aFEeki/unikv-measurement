@@ -1,28 +1,23 @@
 #!/usr/bin/env python3
-"""Figure 5 for the measurement paper — per-step recall cost, BOTH tier modes.
+"""Figure 1 of the paper (fig5_recall_cost): step cost against spilled-set size, both tiers.
 
-Supersedes the single-series version that analyze_recall_cost.py produced from
-the old CPU-pinned-only sweep. Source is B2 Block 1
-(stress_results/b2_isochronal_both_modes.csv), the cooled protocol block.
+Source: stress_results/b2_isochronal_both_modes.csv, the cooled isochronal block
+(run_b2_cooled.py, block 1).
 
-The figure has to carry two facts at once, and they are of different sizes:
+The figure carries two facts of different sizes. The intercepts differ by about
+6 ms (31.3 against 25.3 ms), while the slopes differ less visibly (3.099 against
+2.153 us per cell). Drawn plainly, the intercept gap dominates and the lines
+read as parallel. Two choices prevent that: the region between the fits is
+shaded, so the widening band is the slope difference (6.07 ms at n_spill = 0,
+13.81 ms at 8192), and each fit is labeled with its slope. The y axis starts at
+zero, and the shared no-spill reference is drawn on the plot rather than hidden
+below a truncated axis.
 
-  intercepts differ a lot     31.563 vs 25.423 ms  -> gamma 9.009 vs 2.879 ms
-  slopes differ visibly less  3.0990 vs 2.1531 us/cell
+Every locked value is asserted against the CSV; the script stops and names the
+file on any disagreement rather than drawing something else.
 
-Left to itself the intercept gap dominates and the slope difference reads as
-"the lines are parallel", which is the wrong conclusion. Two devices stop that:
-the region between the fits is shaded, so the widening wedge IS the slope
-difference (6.1 ms at n=0 growing to 13.9 ms at n=8192), and each fit carries
-its slope as a label. The y axis still starts at zero -- the project convention,
-and the shared no-spill reference is drawn on the plot rather than hidden below
-a truncated axis.
-
-Every locked value is asserted against the CSV; the script dies naming the file
-on any disagreement rather than silently drawing something else.
-
-Writes figures/fig5_recall_cost.{pdf,png} and copies the PDF into
-paper/UNIKV-MEASUREMENT/.
+Writes figures/fig5_recall_cost.{pdf,png}, and copies the PDF into
+paper/UNIKV-MEASUREMENT/ if that directory exists.
 """
 
 import csv
@@ -43,8 +38,8 @@ PAPER_DIR = ROOT / "paper" / "UNIKV-MEASUREMENT"
 TOL_MS   = 0.005     # means are quoted to 3 dp
 TOL_FIT  = 0.002     # fitted coefficients
 
-# ---- LOCKED (B2 Block 1; figure conforms to these, not the reverse) --------
-# mode -> (intercept ms, slope us/cell, gamma ms)
+# ---- locked values (isochronal block; the figure conforms to these) ------
+# mode -> (intercept t0 ms, slope us/cell, intercept minus no-spill mean ms)
 FITS = {
     "cpu": (31.317, 3.0990, 8.763),
     "dev": (25.252, 2.1531, 2.708),
@@ -152,7 +147,7 @@ def render():
 
     y_cpu, y_dev = line("cpu"), line("dev")
 
-    # the widening gap IS the slope difference: 6.1 ms at n=0 -> 13.9 ms at NMAX
+    # the widening gap is the slope difference: 6.07 ms at n=0, 13.81 ms at NMAX
     ax.fill_between(xs, y_dev, y_cpu, color=GRAY, alpha=0.13, linewidth=0, zorder=1)
 
     # shared no-spill reference (the two modes agree, t = -0.28)
