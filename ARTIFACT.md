@@ -57,7 +57,7 @@ Table numbers follow the paper.
 | Isochronal design; the confounded long-run slope | `run_recall_cost_isochronal.py` | `stress_results/recall_cost_isochronal.csv`, `recall_cost_steps_A_p3_long.csv`, `recall_cost_steps_B_p1_ctrl.csv` |
 | Device-visible tier; counterbalanced A/B failure | `run_b1_ceiling.py`, `run_b1_interleaved.py` | `stress_results/b1_device_tier_ceiling.csv`, `b1_interleaved_ab.csv` |
 | Table 3: retrieval and 32-token continuation | `run_quality_arms_unified.py` | `quality_results/quality_arms_unified.csv` |
-| H2O comparator fidelity | `run_quality_probe.py` | `quality_results/quality_probe.csv` |
+| H2O comparator fidelity: identity with nothing evicted, the window it beats, the survivor set | `run_quality_arms_unified.py`, `run_h2o_idle_check.py`, `analyze_h2o_survivors.py` | `quality_results/quality_arms_unified.csv`, `h2o_idle_check.csv`, `h2o_survivor_trace_c1024.csv` |
 | Table 4 and Figure 2: 512-token identity, two prompts | `run_token_horizon.py`, `make_fig8_horizon.py` | `quality_results/token_horizon.csv`, full sampled-ID sequences in `quality_results/token_sequences/` |
 | Table 7, block 1 | `run_drain_control.py` | `alpha_results/p3_drain_control_master.csv` |
 | Table 7, block 2: drain×α interaction | `run_drain_alpha1.py` | `alpha_results/p3_drain_alpha1_master.csv` |

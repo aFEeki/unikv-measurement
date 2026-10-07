@@ -32,11 +32,10 @@ to each other and to the reference. Three exactly overlapping curves would
 suggest three measurements agreeing within some tolerance, and there is none.
 
 Data: the sampled-ID traces written by run_token_horizon.py, one file per
-(prompt, arm). SEQ_DIR points at artifacts/token_horizon/sequences/ in the
-working tree; the archive holds the same files under
-quality_results/token_sequences/llama31_8b/. Every value in the figure is
-re-derived from those files and checked against the locked values below, which
-are the ones printed in the paper.
+(prompt, arm), read from quality_results/token_sequences/llama31_8b/ (or, in the
+working tree, from artifacts/token_horizon/sequences/, which holds the same
+files). Every value in the figure is re-derived from those files and checked
+against the locked values below, which are the ones printed in the paper.
 
 Writes figures/fig8_horizon.{pdf,png}, and copies the PDF into
 paper/UNIKV-MEASUREMENT/ if that directory exists.
@@ -49,7 +48,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 ROOT      = Path(__file__).resolve().parents[1]
-SEQ_DIR   = ROOT / "artifacts" / "token_horizon" / "sequences"
+# the archived copy first, then the working tree's; the files are identical
+SEQ_DIR   = next((d for d in (ROOT / "quality_results" / "token_sequences" / "llama31_8b",
+                              ROOT / "artifacts" / "token_horizon" / "sequences") if d.is_dir()),
+                 ROOT / "quality_results" / "token_sequences" / "llama31_8b")
 FIG_DIR   = ROOT / "figures"
 PAPER_DIR = ROOT / "paper" / "UNIKV-MEASUREMENT"
 

@@ -1,0 +1,3 @@
+arm,role,ctx,policy,rc,flash_attn,n_batch,n_ubatch,prompt_tokens,gen_tokens,demotion_calls,token_md5,identical_to_ref,first_divergence,matches_stored_ref,passkey_found,passkey_positions,passkey_line
+ref_p0_c4096,"unmodified runtime, no eviction",4096,0,0,disabled,256,256,3834,32,0,fc78f54189c438600e884f9c24da3358,True,-1,True,True,205 206;212 213,199-218
+h2o_p4_c4096,"H2O, no eviction",4096,4,0,disabled,256,256,3834,32,0,fc78f54189c438600e884f9c24da3358,True,-1,True,True,205 206;212 213,199-218
