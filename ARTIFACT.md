@@ -55,6 +55,7 @@ Table numbers follow the paper.
 |---|---|---|
 | Eq. (1)–(2), t₀, δ, Fig. 1 | `run_b2_cooled.py`, `make_fig5_recall_cost.py` | `stress_results/b2_isochronal_both_modes.csv` |
 | Isochronal design; the confounded long-run slope | `run_recall_cost_isochronal.py` | `stress_results/recall_cost_isochronal.csv`, `recall_cost_steps_A_p3_long.csv`, `recall_cost_steps_B_p1_ctrl.csv` |
+| Section 3: thermal swing within one block; kernel penalty at C = 4096 | settings of `run_policy3_reruns.py`, launched by hand: 512-token prompt, 2048 decoded tokens, greedy, seed 123. The swing block is eight uncooled runs at flash attention off, alternating policies 0 and 3 in the order 0 3 3 0 0 3 3 0, with rows in run order. The penalty is two pairs of policy 0 with flash attention on and off, after 200 s cooldowns | `stress_results/r2_interleaved_c4096.csv`, `r2_fa_penalty_c4096.csv` |
 | Device-visible tier; counterbalanced A/B failure | `run_b1_ceiling.py`, `run_b1_interleaved.py` | `stress_results/b1_device_tier_ceiling.csv`, `b1_interleaved_ab.csv` |
 | Table 3: retrieval and 32-token continuation | `run_quality_arms_unified.py` | `quality_results/quality_arms_unified.csv` |
 | H2O comparator fidelity: identity with nothing evicted, the window it beats, the survivor set | `run_quality_arms_unified.py`, `run_h2o_idle_check.py`, `analyze_h2o_survivors.py` | `quality_results/quality_arms_unified.csv`, `h2o_idle_check.csv`, `h2o_survivor_trace_c1024.csv` |
@@ -80,7 +81,8 @@ Table numbers follow the paper.
 | Table 8: policy comparison, exactness premium | `run_b2_cooled.py` | `stress_results/b2_policy_block.csv` |
 
 Result files not listed above are earlier runs that a later cooled block
-replaced. They are kept, and the paper quotes none of them.
+replaced, among them the uncooled runs Section 3 describes. They are kept,
+and the paper quotes no number from them.
 
 ## License
 
